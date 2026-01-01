@@ -3,8 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <title>خريطتي</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { height: 100vh; }
+    .btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      padding: 10px 15px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <h1>موقع خريطتي يعمل ✅</h1>
+
+<button class="btn" onclick="locateMe()">📍 موقعي الحالي</button>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map('map').setView([33.5138, 36.2765], 6); // سوريا
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  function locateMe() {
+    if (!navigator.geolocation) {
+      alert("المتصفح لا يدعم تحديد الموقع");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      map.setView([lat, lng], 15);
+
+      L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup("📍 موقعك الحالي")
+        .openPopup();
+    }, () => {
+      alert("لم يتم السماح بتحديد الموقع");
+    });
+  }
+</script>
+
 </body>
 </html>
