@@ -13,7 +13,8 @@ body { margin:0; font-family: Arial, sans-serif; }
 
 /* شاشة تسجيل الدخول */
 #loginBox{
-  position:fixed; inset:0;
+  position:fixed;
+  inset:0;
   background:#f5f5f5;
   z-index:20000;
   display:flex;
@@ -28,16 +29,40 @@ body { margin:0; font-family: Arial, sans-serif; }
   text-align:center;
   box-shadow:0 4px 10px rgba(0,0,0,.3);
 }
-#loginBox input{
-  width:100%;
-  padding:8px;
-  margin-bottom:10px;
+
+/* زر الحساب */
+#accountBtn{
+  position:fixed;
+  top:15px;
+  right:15px;
+  z-index:9999;
+  background:white;
+  border:1px solid #ccc;
+  border-radius:20px;
+  padding:6px 12px;
+  cursor:pointer;
+  display:none;
+}
+
+/* قائمة الحساب */
+#accountMenu{
+  position:fixed;
+  top:55px;
+  right:15px;
+  z-index:10000;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 4px 10px rgba(0,0,0,.3);
+  padding:10px;
+  display:none;
+  width:200px;
 }
 
 /* لوحة البحث */
 .panel{
   position:fixed;
-  top:15px; left:15px;
+  top:15px;
+  left:15px;
   z-index:1000;
   background:white;
   padding:10px;
@@ -47,51 +72,13 @@ body { margin:0; font-family: Arial, sans-serif; }
 }
 .panel input{width:100%;padding:6px;margin-bottom:6px}
 .panel button{
-  width:100%;padding:7px;
-  background:#2196f3;color:white;
-  border:none;border-radius:6px;cursor:pointer;
-}
-
-/* أزرار التحكم */
-.controls{
-  position:fixed;
-  top:15px; right:10px;
-  z-index:9999;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.ctrl{
-  padding:10px 14px;
-  color:white;border:none;
-  border-radius:6px;cursor:pointer;
-}
-.save{background:#4caf50}
-.edit{background:#ff9800}
-.del{background:#f44336}
-
-/* زر الحساب */
-#accountBtn{
-  position:fixed;
-  top:15px; right:90px;
-  z-index:9999;
-  background:white;
-  border:1px solid #ccc;
-  border-radius:20px;
-  padding:6px 12px;
+  width:100%;
+  padding:7px;
+  background:#2196f3;
+  color:white;
+  border:none;
+  border-radius:6px;
   cursor:pointer;
-  display:none;
-}
-#accountMenu{
-  position:fixed;
-  top:55px; right:90px;
-  z-index:10000;
-  background:white;
-  border-radius:8px;
-  box-shadow:0 4px 10px rgba(0,0,0,.3);
-  padding:10px;
-  display:none;
-  width:200px;
 }
 </style>
 </head>
@@ -102,52 +89,55 @@ body { margin:0; font-family: Arial, sans-serif; }
 <div id="loginBox">
   <div class="box">
     <h3>تسجيل الدخول</h3>
-<button onclick="googleLogin()" style="
-  width:100%;
-  padding:12px;
-  background:#4285F4;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:15px;
-">
-🔐 تسجيل الدخول باستخدام Google
-</button>
-
-
-<button id="accountBtn" onclick="toggleAccount()">👤 حساب</button>
-
-<div id="accountMenu">
-  <div id="accountEmail" style="margin-bottom:8px"></div>
-  <button onclick="logout()" style="width:100%;padding:8px;background:#f44336;color:white;border:none;border-radius:6px">
-    تسجيل خروج
-  </button>
+    <button onclick="googleLogin()" style="
+      width:100%;
+      padding:12px;
+      background:#4285F4;
+      color:white;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:15px;
+    ">
+      🔐 تسجيل الدخول باستخدام Google
+    </button>
+  </div>
 </div>
 
+<!-- زر الحساب -->
+<button id="accountBtn" onclick="toggleAccount()">👤 حساب</button>
+
+<!-- قائمة الحساب -->
+<div id="accountMenu">
+  <div id="accountEmail" style="margin-bottom:8px"></div>
+  <button onclick="logout()" style="
+    width:100%;
+    padding:8px;
+    background:#f44336;
+    color:white;
+    border:none;
+    border-radius:6px;
+  ">تسجيل خروج</button>
+</div>
+
+<!-- البحث -->
 <div class="panel">
   <input id="search" placeholder="ابحث عن مكان">
   <button onclick="searchPlace()">🔍 بحث</button>
   <button style="margin-top:5px" onclick="locateMe()">📍 موقعي الحالي</button>
 </div>
 
-<div class="controls">
-  <button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
-  <button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
-  <button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
-</div>
-
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Firebase -->
+<!-- Firebase + Google Login -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -163,65 +153,63 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
-window.register = () => {
-  createUserWithEmailAndPassword(
-    auth,
-    loginEmail.value,
-    loginPassword.value
-  ).then(()=>alert("تم إنشاء الحساب"))
-   .catch(e=>alert(e.message));
-};
-
-window.login = () => {
-  signInWithEmailAndPassword(
-    auth,
-    loginEmail.value,
-    loginPassword.value
-  ).catch(e=>alert(e.message));
+window.googleLogin = () => {
+  signInWithPopup(auth, provider)
+    .catch(e => alert(e.message));
 };
 
 window.logout = () => signOut(auth);
 
-onAuthStateChanged(auth, user=>{
-  if(user){
-    loginBox.style.display="none";
-    accountBtn.style.display="block";
-    accountEmail.innerText=user.email;
-  }else{
-    loginBox.style.display="flex";
-    accountBtn.style.display="none";
+onAuthStateChanged(auth, user => {
+  if (user) {
+    loginBox.style.display = "none";
+    accountBtn.style.display = "block";
+    accountEmail.innerText = user.email;
+  } else {
+    loginBox.style.display = "flex";
+    accountBtn.style.display = "none";
   }
 });
+
+window.toggleAccount = () => {
+  accountMenu.style.display =
+    accountMenu.style.display === "block" ? "none" : "block";
+};
 </script>
 
 <script>
-/* ===== الخريطة ===== */
-const map=L.map('map').setView([33.5,36.3],6);
-let marker=null, editMode=false;
+/* الخريطة */
+const map = L.map('map').setView([33.5,36.3],6);
+let marker = null;
 
-const normal=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-normal.addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+.addTo(map);
+
+function setMarker(lat,lon,text){
+  if(marker) map.removeLayer(marker);
+  marker = L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
+}
 
 function searchPlace(){
+  if(!search.value) return;
   fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${search.value}`)
-  .then(r=>r.json()).then(d=>{
-    if(!d.length) return alert("لم يوجد");
+  .then(r=>r.json())
+  .then(d=>{
+    if(!d.length) return alert("لم يتم العثور");
     setMarker(d[0].lat,d[0].lon,d[0].display_name);
     map.setView([d[0].lat,d[0].lon],15);
   });
 }
+
 function locateMe(){
   navigator.geolocation.getCurrentPosition(p=>{
-    setMarker(p.coords.latitude,p.coords.longitude,"موقعك");
+    setMarker(p.coords.latitude,p.coords.longitude,"📍 موقعك");
     map.setView([p.coords.latitude,p.coords.longitude],17);
   });
 }
-map.on('click',e=>{
-  if(!editMode&&marker) return;
-  setMarker(e.latlng.lat,e.latlng.lng,"محدد");
-  editMode=false;
-});
-function setMarker(lat,lon,text){
-  if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lon]).addTo(map).bindPop
+</script>
+
+</body>
+</html>
