@@ -38,8 +38,7 @@ body { margin:0; font-family: Arial, sans-serif; }
   cursor:pointer;
 }
 
-/* أزرار التحكم */
-.ctrl {/* حاوية أزرار التحكم */
+/* حاوية أزرار التحكم */
 .controls {
   position: fixed;
   top: 15px;
@@ -47,7 +46,7 @@ body { margin:0; font-family: Arial, sans-serif; }
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 10px; /* المسافة بين الأزرار */
+  gap: 10px;
 }
 
 /* الأزرار */
@@ -63,9 +62,9 @@ body { margin:0; font-family: Arial, sans-serif; }
 .edit { background:#ff9800; }
 .del  { background:#f44336; }
 
-/* إزاحة زر الطبقات لليسار قليل */
+/* إزاحة زر الطبقات لليسار */
 .leaflet-top.leaflet-left {
-  margin-left: 20px; /* غيّرها إذا بدك */
+  margin-left: 20px;
 }
 </style>
 </head>
@@ -78,9 +77,11 @@ body { margin:0; font-family: Arial, sans-serif; }
   <button style="margin-top:5px" onclick="locateMe()">📍 موقعي الحالي</button>
 </div>
 
-<button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
-<button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
-<button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
+<div class="controls">
+  <button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
+  <button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
+  <button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
+</div>
 
 <div id="map"></div>
 
@@ -90,7 +91,6 @@ body { margin:0; font-family: Arial, sans-serif; }
 /* ===== الخريطة ===== */
 const map = L.map('map').setView([33.5138, 36.2765], 6);
 let marker = null;
-let selectedLatLng = null;
 let editMode = false;
 
 /* ===== الطبقات ===== */
@@ -131,7 +131,6 @@ function searchPlace(){
 
       const lat = d[0].lat;
       const lon = d[0].lon;
-
       map.setView([lat,lon],15);
       setMarker(lat,lon,"📍 "+d[0].display_name);
     });
@@ -149,7 +148,6 @@ function locateMe(){
 /* ===== الضغط على الخريطة ===== */
 map.on('click', e=>{
   if(!editMode && marker) return;
-  selectedLatLng = e.latlng;
   setMarker(e.latlng.lat, e.latlng.lng, "📍 موقع محدد");
   editMode = false;
 });
