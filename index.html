@@ -82,7 +82,34 @@ body { margin:0; font-family: Arial, sans-serif; }
 .save { background:#4caf50; }
 .edit { background:#ff9800; }
 .del  { background:#f44336; }
-.logout { background:#607d8b; }
+
+/* زر الحساب */
+#accountBtn {
+  position: fixed;
+  top: 15px;
+  right: 90px;
+  z-index: 9999;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  display: none;
+}
+
+/* قائمة الحساب */
+#accountMenu {
+  position: fixed;
+  top: 55px;
+  right: 90px;
+  z-index: 10000;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,.3);
+  padding: 10px;
+  display: none;
+  width: 200px;
+}
 
 /* زر الطبقات */
 .leaflet-top.leaflet-left {
@@ -93,7 +120,7 @@ body { margin:0; font-family: Arial, sans-serif; }
 
 <body>
 
-<!-- شاشة تسجيل الدخول -->
+<!-- تسجيل الدخول -->
 <div id="loginBox">
   <div class="box">
     <h3>تسجيل الدخول</h3>
@@ -102,6 +129,17 @@ body { margin:0; font-family: Arial, sans-serif; }
       دخول
     </button>
   </div>
+</div>
+
+<!-- زر الحساب -->
+<button id="accountBtn" onclick="toggleAccount()">👤 حساب</button>
+
+<!-- قائمة الحساب -->
+<div id="accountMenu">
+  <div id="accountEmail" style="margin-bottom:8px;font-size:14px"></div>
+  <button onclick="logout()" style="width:100%;padding:8px;background:#f44336;color:white;border:none;border-radius:6px">
+    تسجيل خروج
+  </button>
 </div>
 
 <div class="panel">
@@ -114,7 +152,6 @@ body { margin:0; font-family: Arial, sans-serif; }
   <button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
   <button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
   <button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
-  <button class="ctrl logout" onclick="logout()">🚪 خروج</button>
 </div>
 
 <div id="map"></div>
@@ -125,18 +162,25 @@ body { margin:0; font-family: Arial, sans-serif; }
 /* ===== تسجيل الدخول ===== */
 if(localStorage.getItem("user")){
   document.getElementById("loginBox").style.display = "none";
+  document.getElementById("accountBtn").style.display = "block";
+  document.getElementById("accountEmail").innerText = localStorage.getItem("user");
 }
 
 function login(){
   const email = document.getElementById("loginEmail").value;
-  if(!email) return alert("اكتب البريد الإلكتروني");
+  if(!email) return alert("اكتب البريد");
   localStorage.setItem("user", email);
-  document.getElementById("loginBox").style.display = "none";
+  location.reload();
 }
 
 function logout(){
   localStorage.removeItem("user");
   location.reload();
+}
+
+function toggleAccount(){
+  const m = document.getElementById("accountMenu");
+  m.style.display = m.style.display === "block" ? "none" : "block";
 }
 
 /* ===== الخريطة ===== */
