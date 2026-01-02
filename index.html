@@ -78,31 +78,6 @@ body { margin:0; font-family: Arial, sans-serif; }
   border-radius:6px;
   cursor:pointer;
 }
-
-/* أزرار التحكم */
-.controls{
-  position:fixed;
-  top:80px;
-  right:15px;
-  z-index:9000;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.ctrl{
-  padding:10px 14px;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-.save{background:#4caf50}
-.edit{background:#ff9800}
-.del{background:#f44336}
-
-.leaflet-control-layers{
-  z-index:5000 !important;
-}
 </style>
 </head>
 
@@ -126,8 +101,10 @@ body { margin:0; font-family: Arial, sans-serif; }
   </div>
 </div>
 
+<!-- زر الحساب -->
 <button id="accountBtn" onclick="toggleAccount()">👤 حساب</button>
 
+<!-- قائمة الحساب -->
 <div id="accountMenu">
   <div id="accountEmail" style="margin-bottom:8px"></div>
   <button onclick="logout()" style="
@@ -136,32 +113,30 @@ body { margin:0; font-family: Arial, sans-serif; }
     background:#f44336;
     color:white;
     border:none;
-    border-radius:6px;">تسجيل خروج</button>
+    border-radius:6px;">
+    تسجيل خروج
+  </button>
 </div>
 
+<!-- البحث -->
 <div class="panel">
-  <input id="search" placeholder="ابحث عن مكان (اسم، شارع، مدينة)">
+  <input id="search" placeholder="ابحث عن مكان">
   <button onclick="searchPlace()">🔍 بحث</button>
   <button style="margin-top:5px" onclick="locateMe()">📍 موقعي الحالي</button>
-</div>
-
-<div class="controls">
-  <button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
-  <button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
-  <button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Firebase -->
+<!-- Firebase + Google Login (Redirect) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -179,84 +154,79 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-window.googleLogin = () => signInWithPopup(auth, provider);
+window.googleLogin = () => {
+  signInWithRedirect(auth, provider);
+};
+
+getRedirectResult(auth).catch(()=>{});
+
 window.logout = () => signOut(auth);
 
-onAuthStateChanged(auth,user=>{
-  if(user){
-    loginBox.style.display="none";
-    accountBtn.style.display="block";
-    accountEmail.innerText=user.email;
-  }else{
-    loginBox.style.display="flex";
-    accountBtn.style.display="none";
+onAuthStateChanged(auth, user => {
+  if (user) {
+    loginBox.style.display = "none";
+    accountBtn.style.display = "block";
+    accountEmail.innerText = user.email;
+  } else {
+    loginBox.style.display = "flex";
+    accountBtn.style.display = "none";
   }
 });
-window.toggleAccount=()=>accountMenu.style.display=
-accountMenu.style.display==="block"?"none":"block";
+
+window.toggleAccount = () => {
+  accountMenu.style.display =
+    accountMenu.style.display === "block" ? "none" : "block";
+};
 </script>
 
 <script>
+/* الخريطة */
 const map = L.map('map').setView([33.5,36.3],6);
-let marker=null, editMode=false;
+let marker=null;
 
 /* الطبقات */
-const normal=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-const terrain=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
+const normal = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+const satellite = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+);
+const terrain = L.tileLayer(
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+);
+
 normal.addTo(map);
 
 L.control.layers(
-  {"🗺️ عادية":normal,"🛰️ قمر صناعي":satellite,"🗻 تضاريس":terrain},
+  {
+    "🗺️ عادية": normal,
+    "🛰️ قمر صناعي": satellite,
+    "🗻 تضاريس": terrain
+  },
   null,
-  {position:"topleft"}
+  { position: "topleft" }
 ).addTo(map);
 
-/* ===== البحث المحسّن ===== */
-function searchPlace(){
-  const q = search.value.trim();
-  if(!q) return alert("اكتب اسم المكان");
+function setMarker(lat,lon,text){
+  if(marker) map.removeLayer(marker);
+  marker = L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
+}
 
-  fetch(
-    `https://nominatim.openstreetmap.org/search?`+
-    `q=${encodeURIComponent(q)}`+
-    `&format=json`+
-    `&limit=5`+
-    `&accept-language=ar`+
-    `&addressdetails=1`
-  )
+function searchPlace(){
+  if(!search.value) return;
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(search.value)}`)
   .then(r=>r.json())
-  .then(data=>{
-    if(!data.length) return alert("لم يتم العثور");
-    const p=data[0];
-    setMarker(p.lat,p.lon,"📍 "+p.display_name);
-    map.setView([p.lat,p.lon],16);
+  .then(d=>{
+    if(!d.length) return alert("لم يتم العثور");
+    setMarker(d[0].lat,d[0].lon,d[0].display_name);
+    map.setView([d[0].lat,d[0].lon],15);
   });
 }
 
 function locateMe(){
   navigator.geolocation.getCurrentPosition(p=>{
-    setMarker(p.coords.latitude,p.coords.longitude,"📍 موقعك");
+    setMarker(p.coords.latitude,p.coords.longitude,"📍 موقعك الحالي");
     map.setView([p.coords.latitude,p.coords.longitude],17);
   });
 }
-
-map.on('click',e=>{
-  if(!editMode && marker) return;
-  setMarker(e.latlng.lat,e.latlng.lng,"📍 موقع محدد");
-  editMode=false;
-});
-
-function setMarker(lat,lon,text){
-  if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
-}
-function savePlace(){
-  if(!marker) return alert("حدد مكان");
-  localStorage.setItem("place",JSON.stringify(marker.getLatLng()));
-}
-function editPlace(){ if(marker) editMode=true; }
-function deletePlace(){ if(marker){map.removeLayer(marker);marker=null;} }
 </script>
 
 </body>
