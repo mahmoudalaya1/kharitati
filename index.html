@@ -39,19 +39,29 @@ body { margin:0; font-family: Arial, sans-serif; }
 }
 
 /* أزرار التحكم */
-.ctrl {
+.ctrl {/* حاوية أزرار التحكم */
+.controls {
   position: fixed;
+  top: 15px;
   right: 10px;
   z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* المسافة بين الأزرار */
+}
+
+/* الأزرار */
+.ctrl {
   padding: 10px 14px;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
 }
-.save { top: 15px; background:#4caf50; }
-.edit { top: 65px; background:#ff9800; }
-.del  { top:115px; background:#f44336; }
+
+.save { background:#4caf50; }
+.edit { background:#ff9800; }
+.del  { background:#f44336; }
 
 /* إزاحة زر الطبقات لليسار قليل */
 .leaflet-top.leaflet-left {
