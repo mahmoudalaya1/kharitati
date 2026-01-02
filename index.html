@@ -102,18 +102,19 @@ body { margin:0; font-family: Arial, sans-serif; }
 <div id="loginBox">
   <div class="box">
     <h3>تسجيل الدخول</h3>
-    <input id="loginEmail" placeholder="البريد الإلكتروني">
-    <input id="loginPassword" type="password" placeholder="كلمة المرور">
+<button onclick="googleLogin()" style="
+  width:100%;
+  padding:12px;
+  background:#4285F4;
+  color:white;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:15px;
+">
+🔐 تسجيل الدخول باستخدام Google
+</button>
 
-    <button onclick="login()" style="width:100%;padding:10px;background:#2196f3;color:white;border:none;border-radius:6px">
-      دخول
-    </button>
-
-    <button onclick="register()" style="margin-top:8px;width:100%;padding:10px">
-      إنشاء حساب
-    </button>
-  </div>
-</div>
 
 <button id="accountBtn" onclick="toggleAccount()">👤 حساب</button>
 
