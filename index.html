@@ -8,36 +8,50 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-  body { margin:0; font-family: Arial, sans-serif; }
-  #map { height:100vh; }
+body { margin:0; font-family: Arial, sans-serif; }
+#map { height:100vh; }
 
-  .panel {
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    z-index: 1000;
-    background: white;
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.3);
-    width: 220px;
-  }
+/* لوحة البحث */
+.panel {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1000;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  width: 220px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+.panel input {
+  width:100%;
+  padding:6px;
+  margin-bottom:6px;
+}
+.panel button {
+  width:100%;
+  padding:7px;
+  background:#2196f3;
+  color:white;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
 
-  .panel input {
-    width:100%;
-    padding:6px;
-    margin-bottom:6px;
-  }
-
-  .panel button {
-    width:100%;
-    padding:7px;
-    background:#2196f3;
-    color:white;
-    border:none;
-    border-radius:6px;
-    cursor:pointer;
-  }
+/* أزرار التحكم */
+.ctrl {
+  position: fixed;
+  right: 10px;
+  z-index: 1000;
+  padding: 10px 14px;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.save { top: 15px; background:#4caf50; }
+.edit { top: 65px; background:#ff9800; }
+.del  { top:115px; background:#f44336; }
 </style>
 </head>
 
@@ -49,40 +63,35 @@
   <button style="margin-top:5px" onclick="locateMe()">📍 موقعي الحالي</button>
 </div>
 
+<button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
+<button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
+<button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-/* ================== إنشاء الخريطة ================== */
+/* ===== الخريطة ===== */
 const map = L.map('map').setView([33.5138, 36.2765], 6);
-let marker;
+let marker = null;
 let selectedLatLng = null;
+let editMode = false;
 
-/* ================== الطبقات ================== */
-const normalMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-});
-
+/* ===== الطبقات ===== */
+const normalMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
 const satelliteMap = L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { attribution: '© Esri' }
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 );
-
 const terrainMap = L.tileLayer(
-  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-  { attribution: '© OpenTopoMap' }
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
 );
-
 const trafficMap = L.tileLayer(
-  'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-  { attribution: '© OpenStreetMap Traffic' }
+  'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
 );
 
-/* تشغيل الافتراضي */
 normalMap.addTo(map);
 
-/* زر واحد للتحكم */
 L.control.layers(
   {
     "🗺️ عادية": normalMap,
@@ -91,68 +100,69 @@ L.control.layers(
   },
   {
     "🚦 حركة المرور": trafficMap
-  },
-  { position: 'topright' }
+  }
 ).addTo(map);
 
-/* ================== البحث ================== */
-function searchPlace() {
+/* ===== البحث ===== */
+function searchPlace(){
   const q = document.getElementById("search").value;
-  if (!q) return alert("اكتب اسم المكان");
+  if(!q) return alert("اكتب اسم المكان");
 
   fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
-    .then(res => res.json())
-    .then(data => {
-      if (!data.length) {
-        alert("لم يتم العثور على المكان");
-        return;
-      }
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.length) return alert("لم يتم العثور");
 
-      const lat = data[0].lat;
-      const lon = data[0].lon;
+      const lat = d[0].lat;
+      const lon = d[0].lon;
 
-      map.setView([lat, lon], 15);
-
-      if (marker) map.removeLayer(marker);
-      marker = L.marker([lat, lon])
-        .addTo(map)
-        .bindPopup("📍 " + data[0].display_name)
-        .openPopup();
+      map.setView([lat,lon],15);
+      setMarker(lat,lon,"📍 "+d[0].display_name);
     });
 }
 
-/* ================== تحديد الموقع ================== */
+/* ===== موقعي ===== */
 function locateMe(){
-  if (!navigator.geolocation) {
-    alert("المتصفح لا يدعم تحديد الموقع");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(pos => {
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-    const acc = Math.round(pos.coords.accuracy);
-
-    map.setView([lat, lon], 17);
-
-    if (marker) map.removeLayer(marker);
-    marker = L.marker([lat, lon])
-      .addTo(map)
-      .bindPopup("📍 موقعك الحالي<br>الدقة: " + acc + " م")
-      .openPopup();
-  });
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude, longitude, accuracy} = pos.coords;
+    map.setView([latitude,longitude],17);
+    setMarker(latitude,longitude,"📍 موقعك<br>الدقة: "+Math.round(accuracy)+"م");
+  },()=>alert("لم يتم السماح"));
 }
 
-/* ================== الضغط على الخريطة ================== */
-map.on('click', function(e){
+/* ===== الضغط على الخريطة ===== */
+map.on('click', e=>{
+  if(!editMode && marker) return;
   selectedLatLng = e.latlng;
-  if (marker) map.removeLayer(marker);
-
-  marker = L.marker(e.latlng)
-    .addTo(map)
-    .bindPopup("📍 موقع محدد")
-    .openPopup();
+  setMarker(e.latlng.lat, e.latlng.lng, "📍 موقع محدد");
+  editMode = false;
 });
+
+/* ===== أدوات ===== */
+function setMarker(lat,lon,text){
+  if(marker) map.removeLayer(marker);
+  marker = L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
+}
+
+function savePlace(){
+  if(!marker) return alert("حدد مكان أولاً");
+  localStorage.setItem("savedPlace", JSON.stringify(marker.getLatLng()));
+  alert("تم الحفظ ✅");
+}
+
+function editPlace(){
+  if(!marker) return alert("لا يوجد مكان");
+  editMode = true;
+  alert("اضغط على الخريطة لتعديل المكان");
+}
+
+function deletePlace(){
+  if(!marker) return;
+  map.removeLayer(marker);
+  marker = null;
+  localStorage.removeItem("savedPlace");
+  alert("تم المسح");
+}
 </script>
 
 </body>
