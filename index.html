@@ -10,7 +10,7 @@
 <style>
 body { margin:0; font-family: Arial, sans-serif; }
 #map { height:100vh; }
-}
+
 /* لوحة البحث */
 .panel {
   position: fixed;
@@ -42,7 +42,7 @@ body { margin:0; font-family: Arial, sans-serif; }
 .ctrl {
   position: fixed;
   right: 10px;
-  z-index: 1000;
+  z-index: 9999;
   padding: 10px 14px;
   color: white;
   border: none;
@@ -52,6 +52,11 @@ body { margin:0; font-family: Arial, sans-serif; }
 .save { top: 15px; background:#4caf50; }
 .edit { top: 65px; background:#ff9800; }
 .del  { top:115px; background:#f44336; }
+
+/* إزاحة زر الطبقات لليسار قليل */
+.leaflet-top.leaflet-left {
+  margin-left: 20px; /* غيّرها إذا بدك */
+}
 </style>
 </head>
 
@@ -100,7 +105,8 @@ L.control.layers(
   },
   {
     "🚦 حركة المرور": trafficMap
-  }
+  },
+  { position: 'topleft' }
 ).addTo(map);
 
 /* ===== البحث ===== */
