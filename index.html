@@ -11,6 +11,30 @@
 body { margin:0; font-family: Arial, sans-serif; }
 #map { height:100vh; }
 
+/* شاشة تسجيل الدخول */
+#loginBox {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#loginBox .box {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 280px;
+  box-shadow: 0 4px 10px rgba(0,0,0,.3);
+  text-align: center;
+}
+#loginBox input {
+  width:100%;
+  padding:8px;
+  margin-bottom:10px;
+}
+
 /* لوحة البحث */
 .panel {
   position: fixed;
@@ -38,7 +62,7 @@ body { margin:0; font-family: Arial, sans-serif; }
   cursor:pointer;
 }
 
-/* حاوية أزرار التحكم */
+/* أزرار التحكم */
 .controls {
   position: fixed;
   top: 15px;
@@ -48,8 +72,6 @@ body { margin:0; font-family: Arial, sans-serif; }
   flex-direction: column;
   gap: 10px;
 }
-
-/* الأزرار */
 .ctrl {
   padding: 10px 14px;
   color: white;
@@ -57,12 +79,12 @@ body { margin:0; font-family: Arial, sans-serif; }
   border-radius: 6px;
   cursor: pointer;
 }
-
 .save { background:#4caf50; }
 .edit { background:#ff9800; }
 .del  { background:#f44336; }
+.logout { background:#607d8b; }
 
-/* إزاحة زر الطبقات لليسار */
+/* زر الطبقات */
 .leaflet-top.leaflet-left {
   margin-left: 20px;
 }
@@ -70,6 +92,17 @@ body { margin:0; font-family: Arial, sans-serif; }
 </head>
 
 <body>
+
+<!-- شاشة تسجيل الدخول -->
+<div id="loginBox">
+  <div class="box">
+    <h3>تسجيل الدخول</h3>
+    <input id="loginEmail" placeholder="البريد الإلكتروني">
+    <button onclick="login()" style="width:100%;padding:10px;background:#2196f3;color:white;border:none;border-radius:6px">
+      دخول
+    </button>
+  </div>
+</div>
 
 <div class="panel">
   <input id="search" placeholder="ابحث عن مكان">
@@ -81,6 +114,7 @@ body { margin:0; font-family: Arial, sans-serif; }
   <button class="ctrl save" onclick="savePlace()">⭐ حفظ</button>
   <button class="ctrl edit" onclick="editPlace()">✏️ تعديل</button>
   <button class="ctrl del" onclick="deletePlace()">🗑️ مسح</button>
+  <button class="ctrl logout" onclick="logout()">🚪 خروج</button>
 </div>
 
 <div id="map"></div>
@@ -88,6 +122,23 @@ body { margin:0; font-family: Arial, sans-serif; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+/* ===== تسجيل الدخول ===== */
+if(localStorage.getItem("user")){
+  document.getElementById("loginBox").style.display = "none";
+}
+
+function login(){
+  const email = document.getElementById("loginEmail").value;
+  if(!email) return alert("اكتب البريد الإلكتروني");
+  localStorage.setItem("user", email);
+  document.getElementById("loginBox").style.display = "none";
+}
+
+function logout(){
+  localStorage.removeItem("user");
+  location.reload();
+}
+
 /* ===== الخريطة ===== */
 const map = L.map('map').setView([33.5138, 36.2765], 6);
 let marker = null;
@@ -128,11 +179,8 @@ function searchPlace(){
     .then(r=>r.json())
     .then(d=>{
       if(!d.length) return alert("لم يتم العثور");
-
-      const lat = d[0].lat;
-      const lon = d[0].lon;
-      map.setView([lat,lon],15);
-      setMarker(lat,lon,"📍 "+d[0].display_name);
+      setMarker(d[0].lat, d[0].lon, "📍 "+d[0].display_name);
+      map.setView([d[0].lat, d[0].lon], 15);
     });
 }
 
@@ -140,9 +188,9 @@ function searchPlace(){
 function locateMe(){
   navigator.geolocation.getCurrentPosition(pos=>{
     const {latitude, longitude, accuracy} = pos.coords;
-    map.setView([latitude,longitude],17);
-    setMarker(latitude,longitude,"📍 موقعك<br>الدقة: "+Math.round(accuracy)+"م");
-  },()=>alert("لم يتم السماح"));
+    setMarker(latitude, longitude, "📍 موقعك<br>الدقة: "+Math.round(accuracy)+"م");
+    map.setView([latitude, longitude], 17);
+  });
 }
 
 /* ===== الضغط على الخريطة ===== */
@@ -157,25 +205,20 @@ function setMarker(lat,lon,text){
   if(marker) map.removeLayer(marker);
   marker = L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
 }
-
 function savePlace(){
-  if(!marker) return alert("حدد مكان أولاً");
+  if(!marker) return alert("حدد مكان");
   localStorage.setItem("savedPlace", JSON.stringify(marker.getLatLng()));
-  alert("تم الحفظ ✅");
+  alert("تم الحفظ");
 }
-
 function editPlace(){
   if(!marker) return alert("لا يوجد مكان");
   editMode = true;
-  alert("اضغط على الخريطة لتعديل المكان");
 }
-
 function deletePlace(){
   if(!marker) return;
   map.removeLayer(marker);
   marker = null;
   localStorage.removeItem("savedPlace");
-  alert("تم المسح");
 }
 </script>
 
