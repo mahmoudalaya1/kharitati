@@ -58,7 +58,7 @@ body { margin:0; font-family: Arial, sans-serif; }
   width:200px;
 }
 
-/* لوحة البحث */
+/* البحث */
 .panel{
   position:fixed;
   top:15px;
@@ -156,8 +156,7 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 window.googleLogin = () => {
-  signInWithPopup(auth, provider)
-    .catch(e => alert(e.message));
+  signInWithPopup(auth, provider).catch(e => alert(e.message));
 };
 
 window.logout = () => signOut(auth);
