@@ -91,7 +91,10 @@ const baseMaps = {
   "🗻 تضاريس": terrainMap
 };
 
-L.control.layers(baseMaps).addTo(map);
+L.control.layers(baseMaps, null, {
+  position: 'topright'
+}).addTo(map);
+
 
 
 function locateMe(){
