@@ -10,23 +10,25 @@
 <style>
   body { margin:0; font-family: Arial, sans-serif; }
   #map { height:100vh; }
-.panel {
-  position: fixed;
-  top: 15px;
-  left: 15px;
-  z-index: 9999;
-  background: white;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  width: 220px;
-}
+
+  .panel {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1000;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    width: 220px;
+  }
 
   .panel input {
     width:100%;
     padding:6px;
     margin-bottom:6px;
   }
+
   .panel button {
     width:100%;
     padding:7px;
@@ -38,6 +40,7 @@
   }
 </style>
 </head>
+
 <body>
 
 <div class="panel">
@@ -45,145 +48,111 @@
   <button onclick="searchPlace()">🔍 بحث</button>
   <button style="margin-top:5px" onclick="locateMe()">📍 موقعي الحالي</button>
 </div>
-<button class="btn" style="top:70px; right:10px;" onclick="savePlace()">⭐ حفظ المكان</button>
-<button class="btn-save">⭐ زر اختبار</button>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  const map = L.map('map').setView([33.5138, 36.2765], 6);
-  let marker;
-  let selectedLatLng = null;
+/* ================== إنشاء الخريطة ================== */
+const map = L.map('map').setView([33.5138, 36.2765], 6);
+let marker;
+let selectedLatLng = null;
 
-  // طبقة الخريطة (مهم جدًا)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
-
-  function searchPlace() {
-    const query = document.getElementById("search").value;
-
-    if (!query) {
-      alert("اكتب اسم مكان");
-      return;
-    }
-
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.length === 0) {
-          alert("لم يتم العثور على المكان");
-          return;
-        }
-
-        const lat = data[0].lat;
-        const lon = data[0].lon;
-
-        map.setView([lat, lon], 15);
-
-        if (marker) map.removeLayer(marker);
-
-        marker = L.marker([lat, lon])
-          .addTo(map)
-          .bindPopup("📍 " + query)
-          .openPopup();
-      })
-      .catch(() => alert("خطأ في الاتصال"));
-  }
-</script>
-
-map.on('click', function(e) {
-  selectedLatLng = e.latlng;
-
-  if (marker) {
-    map.removeLayer(marker);
-  }
-
-  marker = L.marker(e.latlng)
-    .addTo(map)
-    .bindPopup("مكان محدد")
-    .openPopup();
+/* ================== الطبقات ================== */
+const normalMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
 });
 
-// خريطة عادية
-const normalMap = L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  { attribution: '© OpenStreetMap' }
+const satelliteMap = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution: '© Esri' }
 );
 
-// خريطة تضاريس
 const terrainMap = L.tileLayer(
   'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
   { attribution: '© OpenTopoMap' }
 );
 
-// تشغيل الخريطة العادية افتراضيًا
+const trafficMap = L.tileLayer(
+  'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+  { attribution: '© OpenStreetMap Traffic' }
+);
+
+/* تشغيل الافتراضي */
 normalMap.addTo(map);
 
-// زر التبديل
-const baseMaps = {
-  "🗺️ عادية": normalMap,
-  "🗻 تضاريس": terrainMap
-};
+/* زر واحد للتحكم */
+L.control.layers(
+  {
+    "🗺️ عادية": normalMap,
+    "🛰️ قمر صناعي": satelliteMap,
+    "🗻 تضاريس": terrainMap
+  },
+  {
+    "🚦 حركة المرور": trafficMap
+  },
+  { position: 'topright' }
+).addTo(map);
 
-L.control.layers(baseMaps, null, {
-  position: 'topright'
-}).addTo(map);
+/* ================== البحث ================== */
+function searchPlace() {
+  const q = document.getElementById("search").value;
+  if (!q) return alert("اكتب اسم المكان");
 
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.length) {
+        alert("لم يتم العثور على المكان");
+        return;
+      }
 
+      const lat = data[0].lat;
+      const lon = data[0].lon;
 
+      map.setView([lat, lon], 15);
+
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lon])
+        .addTo(map)
+        .bindPopup("📍 " + data[0].display_name)
+        .openPopup();
+    });
+}
+
+/* ================== تحديد الموقع ================== */
 function locateMe(){
   if (!navigator.geolocation) {
     alert("المتصفح لا يدعم تحديد الموقع");
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      const accuracy = pos.coords.accuracy;
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const acc = Math.round(pos.coords.accuracy);
 
-      map.setView([lat, lon], 17);
+    map.setView([lat, lon], 17);
 
-      if (marker) map.removeLayer(marker);
-
-      marker = L.marker([lat, lon])
-        .addTo(map)
-        .bindPopup("📍 موقعك الحالي<br>الدقة: " + Math.round(accuracy) + " متر")
-        .openPopup();
-    },
-    () => alert("لم يتم السماح بتحديد الموقع"),
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  );
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lon])
+      .addTo(map)
+      .bindPopup("📍 موقعك الحالي<br>الدقة: " + acc + " م")
+      .openPopup();
+  });
 }
 
-  function searchPlace(){
-    const q = document.getElementById("search").value;
-    if(!q) return alert("اكتب اسم المكان");
+/* ================== الضغط على الخريطة ================== */
+map.on('click', function(e){
+  selectedLatLng = e.latlng;
+  if (marker) map.removeLayer(marker);
 
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`)
-      .then(res => res.json())
-      .then(data => {
-        if(data.length === 0){
-          alert("لم يتم العثور على المكان");
-          return;
-        }
-        const lat = data[0].lat;
-        const lon = data[0].lon;
-        map.setView([lat, lon], 14);
-        if(marker) map.removeLayer(marker);
-        marker = L.marker([lat, lon]).addTo(map)
-          .bindPopup(data[0].display_name)
-          .openPopup();
-      });
-  }
+  marker = L.marker(e.latlng)
+    .addTo(map)
+    .bindPopup("📍 موقع محدد")
+    .openPopup();
+});
 </script>
 
 </body>
