@@ -55,7 +55,44 @@
 <script>
   const map = L.map('map').setView([33.5138, 36.2765], 6);
   let marker;
-let selectedLatLng = null;
+  let selectedLatLng = null;
+
+  // طبقة الخريطة (مهم جدًا)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  function searchPlace() {
+    const query = document.getElementById("search").value;
+
+    if (!query) {
+      alert("اكتب اسم مكان");
+      return;
+    }
+
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.length === 0) {
+          alert("لم يتم العثور على المكان");
+          return;
+        }
+
+        const lat = data[0].lat;
+        const lon = data[0].lon;
+
+        map.setView([lat, lon], 15);
+
+        if (marker) map.removeLayer(marker);
+
+        marker = L.marker([lat, lon])
+          .addTo(map)
+          .bindPopup("📍 " + query)
+          .openPopup();
+      })
+      .catch(() => alert("خطأ في الاتصال"));
+  }
+</script>
 
 map.on('click', function(e) {
   selectedLatLng = e.latlng;
