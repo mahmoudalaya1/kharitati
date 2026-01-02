@@ -100,7 +100,6 @@ body { margin:0; font-family: Arial, sans-serif; }
 .edit{background:#ff9800}
 .del{background:#f44336}
 
-/* تأكيد ظهور زر الطبقات */
 .leaflet-control-layers{
   z-index:5000 !important;
 }
@@ -141,7 +140,7 @@ body { margin:0; font-family: Arial, sans-serif; }
 </div>
 
 <div class="panel">
-  <input id="search" placeholder="ابحث عن مكان">
+  <input id="search" placeholder="ابحث عن مكان (اسم، شارع، مدينة)">
   <button onclick="searchPlace()">🔍 بحث</button>
   <button style="margin-top:5px" onclick="locateMe()">📍 موقعي الحالي</button>
 </div>
@@ -183,7 +182,7 @@ const provider = new GoogleAuthProvider();
 window.googleLogin = () => signInWithPopup(auth, provider);
 window.logout = () => signOut(auth);
 
-onAuthStateChanged(auth, user=>{
+onAuthStateChanged(auth,user=>{
   if(user){
     loginBox.style.display="none";
     accountBtn.style.display="block";
@@ -205,7 +204,6 @@ let marker=null, editMode=false;
 const normal=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
 const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 const terrain=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
-
 normal.addTo(map);
 
 L.control.layers(
@@ -214,41 +212,51 @@ L.control.layers(
   {position:"topleft"}
 ).addTo(map);
 
-/* أدوات */
-function setMarker(lat,lon,text){
-  if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
-}
+/* ===== البحث المحسّن ===== */
 function searchPlace(){
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${search.value}`)
-  .then(r=>r.json()).then(d=>{
-    if(!d.length) return;
-    setMarker(d[0].lat,d[0].lon,d[0].display_name);
-    map.setView([d[0].lat,d[0].lon],15);
+  const q = search.value.trim();
+  if(!q) return alert("اكتب اسم المكان");
+
+  fetch(
+    `https://nominatim.openstreetmap.org/search?`+
+    `q=${encodeURIComponent(q)}`+
+    `&format=json`+
+    `&limit=5`+
+    `&accept-language=ar`+
+    `&addressdetails=1`
+  )
+  .then(r=>r.json())
+  .then(data=>{
+    if(!data.length) return alert("لم يتم العثور");
+    const p=data[0];
+    setMarker(p.lat,p.lon,"📍 "+p.display_name);
+    map.setView([p.lat,p.lon],16);
   });
 }
+
 function locateMe(){
   navigator.geolocation.getCurrentPosition(p=>{
     setMarker(p.coords.latitude,p.coords.longitude,"📍 موقعك");
     map.setView([p.coords.latitude,p.coords.longitude],17);
   });
 }
+
 map.on('click',e=>{
   if(!editMode && marker) return;
   setMarker(e.latlng.lat,e.latlng.lng,"📍 موقع محدد");
   editMode=false;
 });
+
+function setMarker(lat,lon,text){
+  if(marker) map.removeLayer(marker);
+  marker=L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
+}
 function savePlace(){
   if(!marker) return alert("حدد مكان");
   localStorage.setItem("place",JSON.stringify(marker.getLatLng()));
 }
-function editPlace(){
-  if(!marker) return;
-  editMode=true;
-}
-function deletePlace(){
-  if(marker){map.removeLayer(marker);marker=null;}
-}
+function editPlace(){ if(marker) editMode=true; }
+function deletePlace(){ if(marker){map.removeLayer(marker);marker=null;} }
 </script>
 
 </body>
