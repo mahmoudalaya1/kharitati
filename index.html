@@ -70,9 +70,29 @@ map.on('click', function(e) {
     .openPopup();
 });
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap'
-  }).addTo(map);
+// خريطة عادية
+const normalMap = L.tileLayer(
+  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { attribution: '© OpenStreetMap' }
+);
+
+// خريطة تضاريس
+const terrainMap = L.tileLayer(
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+  { attribution: '© OpenTopoMap' }
+);
+
+// تشغيل الخريطة العادية افتراضيًا
+normalMap.addTo(map);
+
+// زر التبديل
+const baseMaps = {
+  "🗺️ عادية": normalMap,
+  "🗻 تضاريس": terrainMap
+};
+
+L.control.layers(baseMaps).addTo(map);
+
 
 function locateMe(){
   if (!navigator.geolocation) {
