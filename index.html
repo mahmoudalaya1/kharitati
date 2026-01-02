@@ -55,6 +55,20 @@
 <script>
   const map = L.map('map').setView([33.5138, 36.2765], 6);
   let marker;
+let selectedLatLng = null;
+
+map.on('click', function(e) {
+  selectedLatLng = e.latlng;
+
+  if (marker) {
+    map.removeLayer(marker);
+  }
+
+  marker = L.marker(e.latlng)
+    .addTo(map)
+    .bindPopup("مكان محدد")
+    .openPopup();
+});
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'© OpenStreetMap'
