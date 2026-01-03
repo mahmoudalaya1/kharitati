@@ -2,37 +2,58 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>خريطتي</title>
+<title>تسجيل الدخول</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-
 <style>
-body{margin:0}
-#map{height:100vh}
-.logout{
-  position:fixed;
-  top:10px;
-  right:10px;
-  z-index:999;
-  padding:8px 12px;
+body{
+  font-family:Arial;
+  background:#f0f0f0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+.box{
+  background:#fff;
+  padding:20px;
+  width:280px;
+  border-radius:10px;
+  box-shadow:0 4px 10px rgba(0,0,0,.3);
+}
+input,button{
+  width:100%;
+  padding:10px;
+  margin:6px 0;
+}
+button{
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  border-radius:6px;
 }
 </style>
 </head>
 
 <body>
 
-<button class="logout" onclick="logout()">تسجيل خروج</button>
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="box">
+  <h3>تسجيل الدخول</h3>
+  <input id="name" placeholder="الاسم">
+  <input id="email" placeholder="البريد الإلكتروني">
+  <input id="password" type="password" placeholder="كلمة المرور">
+  <button onclick="register()">إنشاء حساب</button>
+  <button onclick="login()">دخول</button>
+  <button onclick="resetPassword()">نسيت كلمة المرور؟</button>
+</div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
@@ -44,30 +65,36 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-window.logout = () => {
-  signOut(auth).then(()=>{
-    window.location.href = "index.html";
-  });
+window.register = () => {
+  const email = emailInput();
+  const password = passwordInput();
+
+  if(!email || !password){
+    alert("املأ البريد وكلمة المرور");
+    return;
+  }
+
+  createUserWithEmailAndPassword(auth,email,password)
+    .then(()=>alert("تم إنشاء الحساب بنجاح"))
+    .catch(e=>alert(e.message));
 };
-</script>
 
-<script>
-// الخريطة
-const map = L.map('map').setView([33.5, 36.3], 6);
+window.login = () => {
+  signInWithEmailAndPassword(auth,emailInput(),passwordInput())
+    .then(()=>alert("تم تسجيل الدخول"))
+    .catch(e=>alert(e.message));
+};
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
+window.resetPassword = () => {
+  if(!emailInput()) return alert("اكتب البريد أولاً");
+  sendPasswordResetEmail(auth,emailInput())
+    .then(()=>alert("تم إرسال رابط تغيير كلمة المرور"))
+    .catch(e=>alert(e.message));
+};
 
-// موقعك الحالي
-navigator.geolocation.getCurrentPosition(pos=>{
-  L.marker([pos.coords.latitude, pos.coords.longitude])
-    .addTo(map)
-    .bindPopup("📍 موقعك الحالي")
-    .openPopup();
+function emailInput(){ return document.getElementById("email").value.trim(); }
+function passwordInput(){ return document.getElementById("password").value.trim(); }
 
-  map.setView([pos.coords.latitude, pos.coords.longitude], 15);
-});
 </script>
 
 </body>
