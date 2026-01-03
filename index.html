@@ -2,10 +2,155 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>خريطتي</title>
+<title>خريطتي | تسجيل الدخول</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#2c2c2c;
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.box{
+  background:#fff;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+  text-align:center;
+}
+input{
+  width:100%;
+  padding:10px;
+  margin:6px 0;
+}
+button{
+  width:100%;
+  padding:10px;
+  margin-top:6px;
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+button.secondary{
+  background:#555;
+}
+.msg{
+  margin-top:10px;
+  color:red;
+  font-size:14px;
+}
+</style>
 </head>
+
 <body>
-<h2>✅ الموقع يعمل</h2>
-<a href="map.html">الدخول إلى الخريطة</a>
+
+<div class="box">
+  <h3>تسجيل الدخول</h3>
+
+  <input id="name" placeholder="الاسم (عند إنشاء حساب)">
+  <input id="email" placeholder="البريد الإلكتروني">
+  <input id="password" type="password" placeholder="كلمة المرور">
+
+  <button onclick="login()">دخول</button>
+  <button onclick="register()">إنشاء حساب</button>
+  <button class="secondary" onclick="resetPassword()">نسيت كلمة المرور؟</button>
+
+  <div id="msg" class="msg"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* 🔥 Firebase config */
+const firebaseConfig = {
+  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
+  authDomain: "kharitati-5cb37.firebaseapp.com",
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.firebasestorage.app",
+  messagingSenderId: "296218682746",
+  appId: "1:296218682746:web:650a1161841ea510eea2c3"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const msg = document.getElementById("msg");
+
+/* تسجيل دخول */
+window.login = async () => {
+  msg.innerText="";
+  try{
+    await signInWithEmailAndPassword(
+      auth,
+      email.value.trim(),
+      password.value
+    );
+    alert("تم تسجيل الدخول بنجاح ✅");
+  }catch(e){
+    msg.innerText = e.message;
+  }
+};
+
+/* إنشاء حساب */
+window.register = async () => {
+  msg.innerText="";
+  if(!name.value || !email.value || !password.value){
+    msg.innerText="املأ جميع الحقول";
+    return;
+  }
+
+  try{
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      email.value.trim(),
+      password.value
+    );
+
+    await setDoc(doc(db,"users",cred.user.uid),{
+      name: name.value,
+      email: email.value,
+      createdAt: new Date()
+    });
+
+    alert("تم إنشاء الحساب بنجاح 🎉");
+  }catch(e){
+    msg.innerText = e.message;
+  }
+};
+
+/* إعادة تعيين كلمة المرور */
+window.resetPassword = async () => {
+  msg.innerText="";
+  if(!email.value){
+    msg.innerText="اكتب البريد الإلكتروني";
+    return;
+  }
+  try{
+    await sendPasswordResetEmail(auth,email.value.trim());
+    alert("تم إرسال رابط إعادة تعيين كلمة المرور 📩");
+  }catch(e){
+    msg.innerText = e.message;
+  }
+};
+</script>
+
 </body>
 </html>
