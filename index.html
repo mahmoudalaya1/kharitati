@@ -5,11 +5,17 @@
 <title>خريطتي | تسجيل الدخول</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <style>
 body{
   margin:0;
   font-family:Arial;
   background:#2c2c2c;
+  height:100vh;
+}
+.center{
   height:100vh;
   display:flex;
   align-items:center;
@@ -45,27 +51,38 @@ button.secondary{
   color:red;
   font-size:14px;
 }
+#map{
+  height:100vh;
+}
 </style>
 </head>
 
 <body>
 
-<div class="box">
-  <h3>تسجيل الدخول</h3>
-<div id="mapPage" style="display:none; height:100vh">
-  <div id="map" style="height:100%"></div>
+<!-- تسجيل الدخول -->
+<div id="loginBox" class="center">
+  <div class="box">
+    <h3>تسجيل الدخول</h3>
+
+    <input id="name" placeholder="الاسم (عند إنشاء حساب)">
+    <input id="email" placeholder="البريد الإلكتروني">
+    <input id="password" type="password" placeholder="كلمة المرور">
+
+    <button onclick="login()">دخول</button>
+    <button onclick="register()">إنشاء حساب</button>
+    <button class="secondary" onclick="resetPassword()">نسيت كلمة المرور؟</button>
+
+    <div id="msg" class="msg"></div>
+  </div>
 </div>
 
-  <input id="name" placeholder="الاسم (عند إنشاء حساب)">
-  <input id="email" placeholder="البريد الإلكتروني">
-  <input id="password" type="password" placeholder="كلمة المرور">
-
-  <button onclick="login()">دخول</button>
-  <button onclick="register()">إنشاء حساب</button>
-  <button class="secondary" onclick="resetPassword()">نسيت كلمة المرور؟</button>
-
-  <div id="msg" class="msg"></div>
+<!-- الخريطة -->
+<div id="mapPage" style="display:none">
+  <div id="map"></div>
 </div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -73,7 +90,8 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore,
@@ -81,7 +99,7 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* 🔥 Firebase config */
+/* Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
@@ -93,54 +111,52 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db   = getFirestore(app);
 
 const msg = document.getElementById("msg");
+const loginBox = document.getElementById("loginBox");
+const mapPage  = document.getElementById("mapPage");
+
+/* مراقبة تسجيل الدخول */
+onAuthStateChanged(auth, user=>{
+  if(user){
+    loginBox.style.display="none";
+    mapPage.style.display="block";
+    initMap();
+  }
+});
 
 /* تسجيل دخول */
-window.login = async () => {
+window.login = async ()=>{
   msg.innerText="";
   try{
-    await signInWithEmailAndPassword(
-      auth,
-      email.value.trim(),
-      password.value
-    );
-    alert("تم تسجيل الدخول بنجاح ✅");
+    await signInWithEmailAndPassword(auth,email.value.trim(),password.value);
   }catch(e){
-    msg.innerText = e.message;
+    msg.innerText="بيانات الدخول غير صحيحة";
   }
 };
 
 /* إنشاء حساب */
-window.register = async () => {
+window.register = async ()=>{
   msg.innerText="";
   if(!name.value || !email.value || !password.value){
     msg.innerText="املأ جميع الحقول";
     return;
   }
-
   try{
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email.value.trim(),
-      password.value
-    );
-
+    const cred = await createUserWithEmailAndPassword(auth,email.value.trim(),password.value);
     await setDoc(doc(db,"users",cred.user.uid),{
-      name: name.value,
-      email: email.value,
-      createdAt: new Date()
+      name:name.value,
+      email:email.value,
+      createdAt:new Date()
     });
-
-    alert("تم إنشاء الحساب بنجاح 🎉");
   }catch(e){
-    msg.innerText = e.message;
+    msg.innerText=e.message;
   }
 };
 
 /* إعادة تعيين كلمة المرور */
-window.resetPassword = async () => {
+window.resetPassword = async ()=>{
   msg.innerText="";
   if(!email.value){
     msg.innerText="اكتب البريد الإلكتروني";
@@ -148,11 +164,19 @@ window.resetPassword = async () => {
   }
   try{
     await sendPasswordResetEmail(auth,email.value.trim());
-    alert("تم إرسال رابط إعادة تعيين كلمة المرور 📩");
+    alert("تم إرسال رابط إعادة التعيين");
   }catch(e){
-    msg.innerText = e.message;
+    msg.innerText=e.message;
   }
 };
+
+/* الخريطة */
+function initMap(){
+  const map = L.map('map').setView([33.5,36.3],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+  }).addTo(map);
+}
 </script>
 
 </body>
