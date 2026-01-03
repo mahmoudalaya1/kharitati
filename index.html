@@ -11,92 +11,96 @@
 body{margin:0;font-family:Arial}
 #map{height:100vh}
 
-/* شاشة تسجيل الدخول */
-#loginBox{
-  position:fixed;
-  inset:0;
-  background:#f5f5f5;
-  z-index:20000;
+/* شاشة الدخول */
+#authBox{
+  position:fixed;inset:0;
+  background:#f2f2f2;
   display:flex;
   align-items:center;
   justify-content:center;
+  z-index:9999;
 }
-#loginBox .box{
-  background:white;
+.auth{
+  background:#fff;
   padding:20px;
-  border-radius:10px;
   width:300px;
-  text-align:center;
+  border-radius:10px;
   box-shadow:0 4px 10px rgba(0,0,0,.3);
+  text-align:center;
 }
-#loginBox input{
+.auth input{
   width:100%;
   padding:8px;
-  margin-bottom:8px;
+  margin:6px 0;
 }
-
-/* أزرار */
-.btn{
+.auth button{
   width:100%;
   padding:10px;
+  margin-top:6px;
   border:none;
+  background:#2196f3;
+  color:#fff;
   border-radius:6px;
   cursor:pointer;
-  margin-bottom:6px;
 }
-.btn-login{background:#2196f3;color:white}
-.btn-register{background:#4caf50;color:white}
-.btn-reset{background:#ff9800;color:white}
+.auth .link{
+  margin-top:8px;
+  font-size:13px;
+  color:#2196f3;
+  cursor:pointer;
+}
 
-/* شريط البحث */
-.search-bar{
-  position:fixed;
-  top:10px;
-  left:10px;
-  background:white;
-  padding:8px;
-  border-radius:25px;
-  display:flex;
-  gap:6px;
-  z-index:5000;
-  box-shadow:0 2px 6px rgba(0,0,0,.3);
+/* الحساب */
+#accountBtn{
+  position:fixed;top:15px;right:15px;
+  z-index:9000;
+  background:#fff;
+  border:1px solid #ccc;
+  border-radius:20px;
+  padding:6px 12px;
+  display:none;
 }
-.search-bar input{
-  border:none;
-  outline:none;
-  width:180px;
+#accountMenu{
+  position:fixed;top:55px;right:15px;
+  background:#fff;
+  padding:10px;
+  border-radius:8px;
+  box-shadow:0 4px 10px rgba(0,0,0,.3);
+  display:none;
+  z-index:9000;
 }
 </style>
 </head>
 
 <body>
 
-<!-- تسجيل الدخول -->
-<div id="loginBox">
-  <div class="box">
-    <h3>تسجيل الدخول</h3>
+<!-- تسجيل الدخول / إنشاء حساب -->
+<div id="authBox">
+  <div class="auth">
+    <h3 id="title">تسجيل الدخول</h3>
 
+    <input id="name" placeholder="الاسم الكامل (لإنشاء حساب)">
     <input id="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)">
+    <input id="password" type="password" placeholder="كلمة المرور">
 
-    <button class="btn btn-login" onclick="login()">دخول</button>
-    <button class="btn btn-register" onclick="register()">إنشاء حساب</button>
-    <button class="btn btn-reset" onclick="resetPassword()">نسيت كلمة المرور؟</button>
+    <button onclick="login()">دخول</button>
+    <button onclick="register()">إنشاء حساب</button>
+
+    <div class="link" onclick="resetPassword()">نسيت كلمة المرور؟</div>
   </div>
 </div>
 
-<!-- البحث -->
-<div class="search-bar">
-  🔍
-  <input id="search" placeholder="ابحث عن مكان">
-  <button onclick="doSearch()">OK</button>
+<button id="accountBtn" onclick="toggleMenu()">👤 حساب</button>
+<div id="accountMenu">
+  <div id="userEmail"></div>
+  <button onclick="logout()">تسجيل خروج</button>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Firebase Email Auth -->
+<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -104,135 +108,96 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* إعداد Firebase */
+import {
+  getFirestore,
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37"
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.firebasestorage.app",
+  messagingSenderId: "296218682746",
+  appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-
-/* تحقق من صحة الإيميل */
-function isValidEmail(e){
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-}
+const db = getFirestore(app);
 
 /* إنشاء حساب */
-window.register = () => {
-  const e = email.value.trim();
-  const p = password.value;
-
-  if(!e || !p){
-    alert("يرجى إدخال البريد وكلمة المرور");
-    return;
-  }
-  if(!isValidEmail(e)){
-    alert("البريد الإلكتروني غير صحيح");
-    return;
-  }
-  if(p.length < 6){
-    alert("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+window.register = async () => {
+  if(!email.value || !password.value || !name.value){
+    alert("املأ كل الحقول");
     return;
   }
 
-  createUserWithEmailAndPassword(auth, e, p)
-    .then(()=>alert("تم إنشاء الحساب بنجاح ✅"))
-    .catch(err=>alert(err.message));
+  try{
+    const cred = await createUserWithEmailAndPassword(auth,email.value,password.value);
+
+    await setDoc(doc(db,"users",cred.user.uid),{
+      name:name.value,
+      email:email.value,
+      created:new Date()
+    });
+
+    alert("تم إنشاء الحساب بنجاح");
+  }catch(e){
+    alert(e.message);
+  }
 };
 
-/* تسجيل الدخول */
-window.login = () => {
-  const e = email.value.trim();
-  const p = password.value;
-
-  if(!e || !p){
-    alert("يرجى إدخال البريد وكلمة المرور");
-    return;
+/* تسجيل دخول */
+window.login = async () => {
+  try{
+    await signInWithEmailAndPassword(auth,email.value,password.value);
+  }catch(e){
+    alert(e.message);
   }
-  if(!isValidEmail(e)){
-    alert("البريد الإلكتروني غير صحيح");
-    return;
-  }
-
-  signInWithEmailAndPassword(auth, e, p)
-    .catch(err=>{
-      if(err.code==="auth/user-not-found"){
-        alert("الحساب غير موجود");
-      }else if(err.code==="auth/wrong-password"){
-        alert("كلمة المرور خاطئة");
-      }else{
-        alert(err.message);
-      }
-    });
 };
 
 /* إعادة تعيين كلمة المرور */
-window.resetPassword = () => {
-  const e = email.value.trim();
-  if(!e){
-    alert("يرجى إدخال البريد الإلكتروني أولاً");
+window.resetPassword = async () => {
+  if(!email.value){
+    alert("اكتب البريد الإلكتروني");
     return;
   }
-  if(!isValidEmail(e)){
-    alert("البريد الإلكتروني غير صحيح");
-    return;
-  }
-
-  sendPasswordResetEmail(auth, e)
-    .then(()=>{
-      alert("📩 تم إرسال رابط تغيير كلمة المرور إلى بريدك");
-    })
-    .catch(err=>{
-      if(err.code==="auth/user-not-found"){
-        alert("هذا البريد غير مسجل");
-      }else{
-        alert(err.message);
-      }
-    });
+  await sendPasswordResetEmail(auth,email.value);
+  alert("تم إرسال رابط تغيير كلمة المرور");
 };
 
-/* عند نجاح الدخول */
+/* تسجيل خروج */
+window.logout = () => signOut(auth);
+
+window.toggleMenu = () =>{
+  accountMenu.style.display =
+    accountMenu.style.display==="block"?"none":"block";
+};
+
+/* حالة المستخدم */
 onAuthStateChanged(auth,user=>{
   if(user){
-    loginBox.style.display="none";
+    authBox.style.display="none";
+    accountBtn.style.display="block";
+    userEmail.innerText=user.email;
+  }else{
+    authBox.style.display="flex";
+    accountBtn.style.display="none";
   }
 });
 </script>
 
 <script>
 /* الخريطة */
-const map=L.map("map").setView([33.5,36.3],6);
-let marker=null;
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+const map=L.map('map').setView([33.5,36.3],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
 .addTo(map);
-
-function setMarker(lat,lon,text){
-  if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lon]).addTo(map).bindPopup(text).openPopup();
-}
-
-/* البحث */
-function doSearch(){
-  if(!search.value) return;
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(search.value)}`)
-  .then(r=>r.json())
-  .then(d=>{
-    if(!d.length){alert("لم يتم العثور");return;}
-    setMarker(d[0].lat,d[0].lon,d[0].display_name);
-    map.setView([d[0].lat,d[0].lon],13);
-  });
-}
-
-/* Enter للبحث */
-search.addEventListener("keydown",e=>{
-  if(e.key==="Enter") doSearch();
-});
 </script>
 
 </body>
