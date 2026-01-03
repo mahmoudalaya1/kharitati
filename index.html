@@ -93,7 +93,14 @@ onAuthStateChanged(auth,user=>{
     document.getElementById("loginBox").style.display="none";
     document.getElementById("map").style.display="block";
     document.getElementById("controls").style.display="block";
-    initMap();
+
+    setTimeout(()=>{
+      initMap();
+      google.maps.event.trigger(map, "resize");
+    },300);
+  }
+});
+
   }else{
     document.getElementById("loginBox").style.display="block";
     document.getElementById("map").style.display="none";
