@@ -2,58 +2,38 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>تسجيل الدخول</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خريطتي</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
 <style>
-body{
-  font-family: Arial;
-  background:#eee;
-}
-.box{
-  width:300px;
-  margin:100px auto;
-  background:#fff;
-  padding:20px;
-  border-radius:6px;
-  text-align:center;
-}
-input,button{
-  width:100%;
-  padding:10px;
-  margin:6px 0;
-}
-button{
-  background:#1976d2;
-  color:#fff;
-  border:none;
-  cursor:pointer;
+body{margin:0}
+#map{height:100vh}
+.logout{
+  position:fixed;
+  top:10px;
+  right:10px;
+  z-index:999;
+  padding:8px 12px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="box">
-  <h3>تسجيل الدخول</h3>
-  <input id="name" placeholder="الاسم">
-  <input id="email" placeholder="البريد الإلكتروني">
-  <input id="password" type="password" placeholder="كلمة المرور">
+<button class="logout" onclick="logout()">تسجيل خروج</button>
+<div id="map"></div>
 
-  <button onclick="register()">إنشاء حساب</button>
-  <button onclick="login()">دخول</button>
-  <button onclick="resetPassword()">نسيت كلمة المرور؟</button>
-</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* 🔥 إعدادات Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
@@ -64,52 +44,30 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-/* 🧠 أدوات */
-const emailVal = () => document.getElementById("email").value.trim();
-const passVal  = () => document.getElementById("password").value.trim();
-const nameVal  = () => document.getElementById("name").value.trim();
-
-/* 🆕 إنشاء حساب */
-window.register = () => {
-  if(!nameVal() || !emailVal() || !passVal()){
-    alert("املأ كل الحقول");
-    return;
-  }
-
-  createUserWithEmailAndPassword(auth, emailVal(), passVal())
-    .then(()=>{
-      alert("تم إنشاء الحساب بنجاح");
-      window.location.href = "map.html";
-    })
-    .catch(e=>alert(e.message));
+window.logout = () => {
+  signOut(auth).then(()=>{
+    window.location.href = "index.html";
+  });
 };
+</script>
 
-/* 🔑 تسجيل دخول */
-window.login = () => {
-  if(!emailVal() || !passVal()){
-    alert("املأ البريد وكلمة المرور");
-    return;
-  }
+<script>
+// الخريطة
+const map = L.map('map').setView([33.5, 36.3], 6);
 
-  signInWithEmailAndPassword(auth, emailVal(), passVal())
-    .then(()=>{
-      alert("تم تسجيل الدخول");
-      window.location.href = "map.html";
-    })
-    .catch(e=>alert(e.message));
-};
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
 
-/* 🔁 إعادة تعيين كلمة المرور */
-window.resetPassword = () => {
-  if(!emailVal()){
-    alert("أدخل البريد الإلكتروني أولاً");
-    return;
-  }
+// موقعك الحالي
+navigator.geolocation.getCurrentPosition(pos=>{
+  L.marker([pos.coords.latitude, pos.coords.longitude])
+    .addTo(map)
+    .bindPopup("📍 موقعك الحالي")
+    .openPopup();
 
-  sendPasswordResetEmail(auth, emailVal())
-    .then(()=>alert("تم إرسال رابط إعادة التعيين"))
-    .catch(e=>alert(e.message));
-};
+  map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+});
 </script>
 
 </body>
