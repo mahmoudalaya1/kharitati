@@ -46,9 +46,9 @@ body{margin:0;font-family:Arial}
 }
 .btn-login{background:#2196f3;color:white}
 .btn-register{background:#4caf50;color:white}
-.btn-google{background:#4285F4;color:white}
+.btn-reset{background:#ff9800;color:white}
 
-/* البحث */
+/* شريط البحث */
 .search-bar{
   position:fixed;
   top:10px;
@@ -77,17 +77,11 @@ body{margin:0;font-family:Arial}
     <h3>تسجيل الدخول</h3>
 
     <input id="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور">
+    <input id="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)">
 
     <button class="btn btn-login" onclick="login()">دخول</button>
     <button class="btn btn-register" onclick="register()">إنشاء حساب</button>
-
-    <hr>
-
-    <!-- Google Login (خارجي فقط) -->
-    <button class="btn btn-google" onclick="openGoogleLogin()">
-      تسجيل الدخول باستخدام Google
-    </button>
+    <button class="btn btn-reset" onclick="resetPassword()">نسيت كلمة المرور؟</button>
   </div>
 </div>
 
@@ -102,16 +96,18 @@ body{margin:0;font-family:Arial}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Firebase Email Login -->
+<!-- Firebase Email Auth -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+/* إعداد Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
@@ -121,20 +117,86 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+/* تحقق من صحة الإيميل */
+function isValidEmail(e){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
 /* إنشاء حساب */
 window.register = () => {
-  createUserWithEmailAndPassword(auth, email.value, password.value)
-    .then(()=>alert("تم إنشاء الحساب"))
-    .catch(e=>alert(e.message));
+  const e = email.value.trim();
+  const p = password.value;
+
+  if(!e || !p){
+    alert("يرجى إدخال البريد وكلمة المرور");
+    return;
+  }
+  if(!isValidEmail(e)){
+    alert("البريد الإلكتروني غير صحيح");
+    return;
+  }
+  if(p.length < 6){
+    alert("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+    return;
+  }
+
+  createUserWithEmailAndPassword(auth, e, p)
+    .then(()=>alert("تم إنشاء الحساب بنجاح ✅"))
+    .catch(err=>alert(err.message));
 };
 
-/* تسجيل دخول */
+/* تسجيل الدخول */
 window.login = () => {
-  signInWithEmailAndPassword(auth, email.value, password.value)
-    .catch(e=>alert(e.message));
+  const e = email.value.trim();
+  const p = password.value;
+
+  if(!e || !p){
+    alert("يرجى إدخال البريد وكلمة المرور");
+    return;
+  }
+  if(!isValidEmail(e)){
+    alert("البريد الإلكتروني غير صحيح");
+    return;
+  }
+
+  signInWithEmailAndPassword(auth, e, p)
+    .catch(err=>{
+      if(err.code==="auth/user-not-found"){
+        alert("الحساب غير موجود");
+      }else if(err.code==="auth/wrong-password"){
+        alert("كلمة المرور خاطئة");
+      }else{
+        alert(err.message);
+      }
+    });
 };
 
-/* حالة المستخدم */
+/* إعادة تعيين كلمة المرور */
+window.resetPassword = () => {
+  const e = email.value.trim();
+  if(!e){
+    alert("يرجى إدخال البريد الإلكتروني أولاً");
+    return;
+  }
+  if(!isValidEmail(e)){
+    alert("البريد الإلكتروني غير صحيح");
+    return;
+  }
+
+  sendPasswordResetEmail(auth, e)
+    .then(()=>{
+      alert("📩 تم إرسال رابط تغيير كلمة المرور إلى بريدك");
+    })
+    .catch(err=>{
+      if(err.code==="auth/user-not-found"){
+        alert("هذا البريد غير مسجل");
+      }else{
+        alert(err.message);
+      }
+    });
+};
+
+/* عند نجاح الدخول */
 onAuthStateChanged(auth,user=>{
   if(user){
     loginBox.style.display="none";
@@ -143,14 +205,6 @@ onAuthStateChanged(auth,user=>{
 </script>
 
 <script>
-/* Google Login خارجي */
-function openGoogleLogin(){
-  window.open(
-    "https://mahmoudalaya1.github.io/kharitati/",
-    "_system"
-  );
-}
-
 /* الخريطة */
 const map=L.map("map").setView([33.5,36.3],6);
 let marker=null;
