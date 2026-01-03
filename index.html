@@ -2,98 +2,57 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>خريطتي - تسجيل الدخول</title>
+<title>تسجيل الدخول</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
 body{
-  margin:0;
-  font-family: Arial, sans-serif;
-  background:#f0f2f5;
-}
-#loginBox{
-  position:fixed;
-  inset:0;
+  font-family:Arial;
+  background:#f0f0f0;
   display:flex;
-  align-items:center;
   justify-content:center;
+  align-items:center;
+  height:100vh;
 }
 .box{
-  background:white;
-  width:300px;
+  background:#fff;
   padding:20px;
+  width:280px;
   border-radius:10px;
   box-shadow:0 4px 10px rgba(0,0,0,.3);
-  text-align:center;
 }
-input{
+input,button{
   width:100%;
-  padding:8px;
+  padding:10px;
   margin:6px 0;
 }
 button{
-  width:100%;
-  padding:10px;
-  margin-top:6px;
+  background:#1976d2;
+  color:#fff;
   border:none;
   border-radius:6px;
-  background:#1976d2;
-  color:white;
-  cursor:pointer;
-}
-button.secondary{
-  background:#555;
-}
-a{
-  display:block;
-  margin-top:8px;
-  font-size:13px;
-  cursor:pointer;
-  color:#1976d2;
-}
-#app{
-  display:none;
-  padding:20px;
 }
 </style>
 </head>
 
 <body>
 
-<!-- تسجيل الدخول -->
-<div id="loginBox">
-  <div class="box">
-    <h3>تسجيل الدخول</h3>
-
-    <input id="name" placeholder="الاسم (لإنشاء حساب)">
-    <input id="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور">
-
-    <button onclick="login()">دخول</button>
-    <button class="secondary" onclick="register()">إنشاء حساب</button>
-
-    <a onclick="resetPassword()">نسيت كلمة المرور؟</a>
-  </div>
+<div class="box">
+  <h3>تسجيل الدخول</h3>
+  <input id="name" placeholder="الاسم">
+  <input id="email" placeholder="البريد الإلكتروني">
+  <input id="password" type="password" placeholder="كلمة المرور">
+  <button onclick="register()">إنشاء حساب</button>
+  <button onclick="login()">دخول</button>
+  <button onclick="resetPassword()">نسيت كلمة المرور؟</button>
 </div>
 
-<!-- التطبيق -->
-<div id="app">
-  <h2>مرحبًا 👋</h2>
-  <p id="userInfo"></p>
-  <button onclick="logout()">تسجيل خروج</button>
-</div>
-
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  onAuthStateChanged,
-  signOut,
-  updateProfile
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -106,72 +65,36 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-/* إنشاء حساب */
-window.register = async () => {
+window.register = () => {
   const email = emailInput();
   const password = passwordInput();
-  const name = document.getElementById("name").value.trim();
 
   if(!email || !password){
-    alert("أدخل الإيميل وكلمة المرور");
+    alert("املأ البريد وكلمة المرور");
     return;
   }
 
-  try{
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    if(name){
-      await updateProfile(cred.user,{displayName:name});
-    }
-    alert("تم إنشاء الحساب بنجاح");
-  }catch(e){
-    alert(e.message);
-  }
+  createUserWithEmailAndPassword(auth,email,password)
+    .then(()=>alert("تم إنشاء الحساب بنجاح"))
+    .catch(e=>alert(e.message));
 };
 
-/* تسجيل دخول */
-window.login = async () => {
-  try{
-    await signInWithEmailAndPassword(auth, emailInput(), passwordInput());
-  }catch(e){
-    alert(e.message);
-  }
+window.login = () => {
+  signInWithEmailAndPassword(auth,emailInput(),passwordInput())
+    .then(()=>alert("تم تسجيل الدخول"))
+    .catch(e=>alert(e.message));
 };
 
-/* استعادة كلمة المرور */
-window.resetPassword = async () => {
-  const email = emailInput();
-  if(!email){
-    alert("اكتب البريد الإلكتروني أولًا");
-    return;
-  }
-  try{
-    await sendPasswordResetEmail(auth,email);
-    alert("تم إرسال رابط تغيير كلمة المرور");
-  }catch(e){
-    alert(e.message);
-  }
+window.resetPassword = () => {
+  if(!emailInput()) return alert("اكتب البريد أولاً");
+  sendPasswordResetEmail(auth,emailInput())
+    .then(()=>alert("تم إرسال رابط تغيير كلمة المرور"))
+    .catch(e=>alert(e.message));
 };
 
-/* تسجيل خروج */
-window.logout = () => signOut(auth);
+function emailInput(){ return document.getElementById("email").value.trim(); }
+function passwordInput(){ return document.getElementById("password").value.trim(); }
 
-/* مراقبة الجلسة */
-onAuthStateChanged(auth,user=>{
-  if(user){
-    loginBox.style.display="none";
-    app.style.display="block";
-    userInfo.innerText =
-      "الاسم: " + (user.displayName || "بدون اسم") +
-      "\nالبريد: " + user.email;
-  }else{
-    loginBox.style.display="flex";
-    app.style.display="none";
-  }
-});
-
-/* Helpers */
-function emailInput(){return document.getElementById("email").value.trim();}
-function passwordInput(){return document.getElementById("password").value;}
 </script>
 
 </body>
