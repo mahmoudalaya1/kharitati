@@ -2,185 +2,142 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>خريطتي | تسجيل الدخول</title>
+<title>خريطتي</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
 <style>
-body{
-  margin:0;
-  font-family:Arial;
-  background:#2c2c2c;
-  height:100vh;
+body{margin:0;font-family:Arial;background:#111;color:#fff}
+#loginBox{
+  width:320px;margin:80px auto;background:#fff;color:#000;
+  padding:20px;border-radius:10px;text-align:center
 }
-.center{
-  height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-.box{
-  background:#fff;
-  padding:20px;
-  border-radius:10px;
-  width:300px;
-  text-align:center;
-}
-input{
-  width:100%;
-  padding:10px;
-  margin:6px 0;
-}
-button{
-  width:100%;
-  padding:10px;
-  margin-top:6px;
-  background:#1976d2;
-  color:#fff;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-button.secondary{
-  background:#555;
-}
-.msg{
-  margin-top:10px;
-  color:red;
-  font-size:14px;
-}
-#map{
-  height:100vh;
+input,button{width:100%;padding:10px;margin:6px 0}
+button{background:#1976d2;color:#fff;border:none;border-radius:6px}
+#map{display:none;height:100vh;width:100%}
+#controls{
+  position:absolute;top:10px;left:10px;z-index:5;
+  background:#fff;color:#000;padding:10px;border-radius:8px
 }
 </style>
 </head>
 
 <body>
 
-<!-- تسجيل الدخول -->
-<div id="loginBox" class="center">
-  <div class="box">
-    <h3>تسجيل الدخول</h3>
-
-    <input id="name" placeholder="الاسم (عند إنشاء حساب)">
-    <input id="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور">
-
-    <button onclick="login()">دخول</button>
-    <button onclick="register()">إنشاء حساب</button>
-    <button class="secondary" onclick="resetPassword()">نسيت كلمة المرور؟</button>
-
-    <div id="msg" class="msg"></div>
-  </div>
+<!-- LOGIN -->
+<div id="loginBox">
+  <h3>تسجيل الدخول</h3>
+  <input id="email" placeholder="البريد الإلكتروني">
+  <input id="password" type="password" placeholder="كلمة المرور">
+  <button onclick="login()">دخول</button>
+  <button onclick="register()">إنشاء حساب</button>
+  <button onclick="resetPassword()">نسيت كلمة المرور؟</button>
+  <div id="msg" style="color:red"></div>
 </div>
 
-<!-- الخريطة -->
-<div id="mapPage" style="display:none">
-  <div id="map"></div>
+<!-- MAP -->
+<div id="map"></div>
+
+<div id="controls" style="display:none">
+  <input id="search" placeholder="بحث مكان...">
+  <button onclick="searchPlace()">بحث</button>
+  <button onclick="toggleTerrain()">تضاريس</button>
+  <button onclick="rotateMap()">تدوير</button>
+  <button onclick="toggleStreet()">Street View</button>
+  <button onclick="logout()">تسجيل خروج</button>
 </div>
 
-<!-- Leaflet -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  onAuthStateChanged
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore,
-  doc,
-  setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.firebasestorage.app",
-  messagingSenderId: "296218682746",
-  appId: "1:296218682746:web:650a1161841ea510eea2c3"
+  projectId: "kharitati-5cb37"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
-
 const msg = document.getElementById("msg");
-const loginBox = document.getElementById("loginBox");
-const mapPage  = document.getElementById("mapPage");
 
-/* مراقبة تسجيل الدخول */
-onAuthStateChanged(auth, user=>{
+window.login = async()=>{
+  try{
+    await signInWithEmailAndPassword(auth,email.value,password.value);
+  }catch(e){msg.innerText=e.message}
+};
+
+window.register = async()=>{
+  try{
+    await createUserWithEmailAndPassword(auth,email.value,password.value);
+    alert("تم إنشاء الحساب");
+  }catch(e){msg.innerText=e.message}
+};
+
+window.resetPassword = async()=>{
+  await sendPasswordResetEmail(auth,email.value);
+  alert("تم إرسال رابط الاستعادة");
+};
+
+window.logout = ()=>signOut(auth);
+
+onAuthStateChanged(auth,user=>{
   if(user){
-    loginBox.style.display="none";
-    mapPage.style.display="block";
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("map").style.display="block";
+    document.getElementById("controls").style.display="block";
     initMap();
+  }else{
+    document.getElementById("loginBox").style.display="block";
+    document.getElementById("map").style.display="none";
+    document.getElementById("controls").style.display="none";
   }
 });
+</script>
 
-window.login = async ()=>{
-  msg.innerText="";
-  try{
-    await signInWithEmailAndPassword(
-      auth,
-      email.value.trim(),
-      password.value
-    );
-    // لا نضع alert هنا ❌
-  }catch(e){
-    msg.innerText="بيانات الدخول غير صحيحة";
-  }
-};
+<!-- Google Maps -->
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_KEY&libraries=places"></script>
+<script>
+let map, terrain=false, street=false, panorama;
 
-
-/* إنشاء حساب */
-window.register = async ()=>{
-  msg.innerText="";
-  if(!name.value || !email.value || !password.value){
-    msg.innerText="املأ جميع الحقول";
-    return;
-  }
-  try{
-    const cred = await createUserWithEmailAndPassword(auth,email.value.trim(),password.value);
-    await setDoc(doc(db,"users",cred.user.uid),{
-      name:name.value,
-      email:email.value,
-      createdAt:new Date()
-    });
-  }catch(e){
-    msg.innerText=e.message;
-  }
-};
-
-/* إعادة تعيين كلمة المرور */
-window.resetPassword = async ()=>{
-  msg.innerText="";
-  if(!email.value){
-    msg.innerText="اكتب البريد الإلكتروني";
-    return;
-  }
-  try{
-    await sendPasswordResetEmail(auth,email.value.trim());
-    alert("تم إرسال رابط إعادة التعيين");
-  }catch(e){
-    msg.innerText=e.message;
-  }
-};
-
-/* الخريطة */
 function initMap(){
-  const map = L.map('map').setView([33.5,36.3],6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap'
-  }).addTo(map);
+  map=new google.maps.Map(document.getElementById("map"),{
+    center:{lat:36.2021,lng:37.1343},
+    zoom:14,
+    mapTypeId:"roadmap"
+  });
+  panorama = map.getStreetView();
+}
+
+function searchPlace(){
+  const service=new google.maps.places.PlacesService(map);
+  service.textSearch({query:search.value},(res,status)=>{
+    if(status==="OK"){
+      map.setCenter(res[0].geometry.location);
+    }
+  });
+}
+
+function toggleTerrain(){
+  terrain=!terrain;
+  map.setMapTypeId(terrain?"terrain":"roadmap");
+}
+
+function rotateMap(){
+  map.setHeading((map.getHeading()||0)+45);
+}
+
+function toggleStreet(){
+  street=!street;
+  panorama.setPosition(map.getCenter());
+  panorama.setVisible(street);
 }
 </script>
 
