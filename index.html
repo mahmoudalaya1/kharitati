@@ -126,15 +126,20 @@ onAuthStateChanged(auth, user=>{
   }
 });
 
-/* تسجيل دخول */
 window.login = async ()=>{
   msg.innerText="";
   try{
-    await signInWithEmailAndPassword(auth,email.value.trim(),password.value);
+    await signInWithEmailAndPassword(
+      auth,
+      email.value.trim(),
+      password.value
+    );
+    // لا نضع alert هنا ❌
   }catch(e){
     msg.innerText="بيانات الدخول غير صحيحة";
   }
 };
+
 
 /* إنشاء حساب */
 window.register = async ()=>{
