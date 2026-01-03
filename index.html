@@ -2,103 +2,86 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>خريطتي</title>
+<title>خريطتي - تسجيل الدخول</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
 <style>
-body{margin:0;font-family:Arial}
-#map{height:100vh}
-
-/* شاشة الدخول */
-#authBox{
-  position:fixed;inset:0;
-  background:#f2f2f2;
+body{
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#f0f2f5;
+}
+#loginBox{
+  position:fixed;
+  inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
-  z-index:9999;
 }
-.auth{
-  background:#fff;
-  padding:20px;
+.box{
+  background:white;
   width:300px;
+  padding:20px;
   border-radius:10px;
   box-shadow:0 4px 10px rgba(0,0,0,.3);
   text-align:center;
 }
-.auth input{
+input{
   width:100%;
   padding:8px;
   margin:6px 0;
 }
-.auth button{
+button{
   width:100%;
   padding:10px;
   margin-top:6px;
   border:none;
-  background:#2196f3;
-  color:#fff;
   border-radius:6px;
+  background:#1976d2;
+  color:white;
   cursor:pointer;
 }
-.auth .link{
+button.secondary{
+  background:#555;
+}
+a{
+  display:block;
   margin-top:8px;
   font-size:13px;
-  color:#2196f3;
   cursor:pointer;
+  color:#1976d2;
 }
-
-/* الحساب */
-#accountBtn{
-  position:fixed;top:15px;right:15px;
-  z-index:9000;
-  background:#fff;
-  border:1px solid #ccc;
-  border-radius:20px;
-  padding:6px 12px;
+#app{
   display:none;
-}
-#accountMenu{
-  position:fixed;top:55px;right:15px;
-  background:#fff;
-  padding:10px;
-  border-radius:8px;
-  box-shadow:0 4px 10px rgba(0,0,0,.3);
-  display:none;
-  z-index:9000;
+  padding:20px;
 }
 </style>
 </head>
 
 <body>
 
-<!-- تسجيل الدخول / إنشاء حساب -->
-<div id="authBox">
-  <div class="auth">
-    <h3 id="title">تسجيل الدخول</h3>
+<!-- تسجيل الدخول -->
+<div id="loginBox">
+  <div class="box">
+    <h3>تسجيل الدخول</h3>
 
-    <input id="name" placeholder="الاسم الكامل (لإنشاء حساب)">
+    <input id="name" placeholder="الاسم (لإنشاء حساب)">
     <input id="email" placeholder="البريد الإلكتروني">
     <input id="password" type="password" placeholder="كلمة المرور">
 
     <button onclick="login()">دخول</button>
-    <button onclick="register()">إنشاء حساب</button>
+    <button class="secondary" onclick="register()">إنشاء حساب</button>
 
-    <div class="link" onclick="resetPassword()">نسيت كلمة المرور؟</div>
+    <a onclick="resetPassword()">نسيت كلمة المرور؟</a>
   </div>
 </div>
 
-<button id="accountBtn" onclick="toggleMenu()">👤 حساب</button>
-<div id="accountMenu">
-  <div id="userEmail"></div>
+<!-- التطبيق -->
+<div id="app">
+  <h2>مرحبًا 👋</h2>
+  <p id="userInfo"></p>
   <button onclick="logout()">تسجيل خروج</button>
 </div>
-
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- Firebase -->
 <script type="module">
@@ -109,44 +92,36 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   onAuthStateChanged,
-  signOut
+  signOut,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import {
-  getFirestore,
-  doc,
-  setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
   projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.firebasestorage.app",
-  messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
 
 /* إنشاء حساب */
 window.register = async () => {
-  if(!email.value || !password.value || !name.value){
-    alert("املأ كل الحقول");
+  const email = emailInput();
+  const password = passwordInput();
+  const name = document.getElementById("name").value.trim();
+
+  if(!email || !password){
+    alert("أدخل الإيميل وكلمة المرور");
     return;
   }
 
   try{
-    const cred = await createUserWithEmailAndPassword(auth,email.value,password.value);
-
-    await setDoc(doc(db,"users",cred.user.uid),{
-      name:name.value,
-      email:email.value,
-      created:new Date()
-    });
-
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    if(name){
+      await updateProfile(cred.user,{displayName:name});
+    }
     alert("تم إنشاء الحساب بنجاح");
   }catch(e){
     alert(e.message);
@@ -156,48 +131,47 @@ window.register = async () => {
 /* تسجيل دخول */
 window.login = async () => {
   try{
-    await signInWithEmailAndPassword(auth,email.value,password.value);
+    await signInWithEmailAndPassword(auth, emailInput(), passwordInput());
   }catch(e){
     alert(e.message);
   }
 };
 
-/* إعادة تعيين كلمة المرور */
+/* استعادة كلمة المرور */
 window.resetPassword = async () => {
-  if(!email.value){
-    alert("اكتب البريد الإلكتروني");
+  const email = emailInput();
+  if(!email){
+    alert("اكتب البريد الإلكتروني أولًا");
     return;
   }
-  await sendPasswordResetEmail(auth,email.value);
-  alert("تم إرسال رابط تغيير كلمة المرور");
+  try{
+    await sendPasswordResetEmail(auth,email);
+    alert("تم إرسال رابط تغيير كلمة المرور");
+  }catch(e){
+    alert(e.message);
+  }
 };
 
 /* تسجيل خروج */
 window.logout = () => signOut(auth);
 
-window.toggleMenu = () =>{
-  accountMenu.style.display =
-    accountMenu.style.display==="block"?"none":"block";
-};
-
-/* حالة المستخدم */
+/* مراقبة الجلسة */
 onAuthStateChanged(auth,user=>{
   if(user){
-    authBox.style.display="none";
-    accountBtn.style.display="block";
-    userEmail.innerText=user.email;
+    loginBox.style.display="none";
+    app.style.display="block";
+    userInfo.innerText =
+      "الاسم: " + (user.displayName || "بدون اسم") +
+      "\nالبريد: " + user.email;
   }else{
-    authBox.style.display="flex";
-    accountBtn.style.display="none";
+    loginBox.style.display="flex";
+    app.style.display="none";
   }
 });
-</script>
 
-<script>
-/* الخريطة */
-const map=L.map('map').setView([33.5,36.3],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
-.addTo(map);
+/* Helpers */
+function emailInput(){return document.getElementById("email").value.trim();}
+function passwordInput(){return document.getElementById("password").value;}
 </script>
 
 </body>
