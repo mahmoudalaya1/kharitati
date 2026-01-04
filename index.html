@@ -2,67 +2,36 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>My Maps</title>
+<title>My Maps Pro</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css">
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <style>
 html,body,#map{height:100%;margin:0;font-family:Arial}
 #map{z-index:1}
-
-/* ===== Search Bar ===== */
-#searchBar{
-  position:absolute;top:12px;left:50%;
-  transform:translateX(-50%);
-  background:white;
-  width:92%;max-width:460px;
-  padding:12px 16px;
-  border-radius:30px;
-  box-shadow:0 4px 12px rgba(0,0,0,.3);
-  z-index:999
-}
-#searchBar input{
-  border:none;width:100%;
-  font-size:16px;outline:none
-}
-#results{
-  margin-top:8px;font-size:14px
-}
-
-/* ===== Floating Buttons ===== */
-#float{
-  position:absolute;right:12px;bottom:140px;
-  display:flex;flex-direction:column;gap:10px;
-  z-index:999
-}
-#float button{
-  width:52px;height:52px;
-  border:none;border-radius:50%;
-  background:white;font-size:22px;
-  box-shadow:0 3px 10px rgba(0,0,0,.3)
-}
-
-/* ===== Bottom Sheet ===== */
-#sheet{
-  position:absolute;bottom:0;left:0;
-  width:100%;background:white;
-  border-radius:22px 22px 0 0;
+#arrow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:40px;z-index:999}
+#panel{
+  position:absolute;bottom:0;width:100%;
+  background:white;padding:14px;
+  border-radius:20px 20px 0 0;
   box-shadow:0 -4px 20px rgba(0,0,0,.3);
-  padding:16px;
   z-index:999
 }
-#sheet h3{margin:0 0 8px}
-#sheet p{margin:0;font-size:14px;color:#444}
-
-/* ===== Arrow ===== */
-#arrow{
-  position:absolute;left:50%;top:50%;
-  transform:translate(-50%,-50%);
-  font-size:42px;z-index:998
+#btns{
+  position:absolute;right:10px;top:80px;
+  display:flex;flex-direction:column;gap:8px;
+  z-index:999
+}
+#btns button{
+  width:50px;height:50px;border:none;
+  border-radius:50%;font-size:22px;
+  background:white;box-shadow:0 3px 10px rgba(0,0,0,.3)
 }
 </style>
 </head>
@@ -72,76 +41,62 @@ html,body,#map{height:100%;margin:0;font-family:Arial}
 <div id="map"></div>
 <div id="arrow">⬆️</div>
 
-<!-- Search -->
-<div id="searchBar">
-  <input id="search" placeholder="ابحث عن مكان">
-  <div id="results"></div>
+<div id="btns">
+  <button onclick="toggleTraffic()">🚦</button>
+  <button onclick="toggleFollow()">🧭</button>
 </div>
 
-<!-- Floating -->
-<div id="float">
-  <button onclick="locate()">📍</button>
-  <button onclick="toggleDark()">🌙</button>
-  <button onclick="startNav()">▶️</button>
-</div>
-
-<!-- Bottom Sheet -->
-<div id="sheet">
-  <h3 id="title">جاهز للملاحة</h3>
-  <p id="info">اختر وجهة للبدء</p>
+<div id="panel">
+  <b id="step">جاهز للملاحة</b><br>
+  <span id="eta">---</span>
 </div>
 
 <script>
-/* ===== MAP ===== */
+/* ================= MAP ================= */
 const map=L.map("map",{zoomControl:false}).setView([36.2,37.13],15);
 const normal=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-const dark=L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png");
 
-let darkOn=false;
-function toggleDark(){
-  darkOn?map.removeLayer(dark):map.addLayer(dark);
-  darkOn=!darkOn;
+/* 🟡 Traffic Layer */
+const traffic=L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png");
+let trafficOn=false;
+function toggleTraffic(){
+  trafficOn?map.removeLayer(traffic):map.addLayer(traffic);
+  trafficOn=!trafficOn;
 }
 
-/* ===== LOCATION ===== */
-let start=null,end=null,route=null,marker=null;
+/* 🔴 جاهز لـ Traffic API حقيقي (مثال Mapbox)
+const trafficReal = L.tileLayer(
+  `https://api.mapbox.com/styles/v1/mapbox/traffic-day-v2/tiles/{z}/{x}/{y}?access_token=PUT_API_KEY_HERE`
+);
+*/
+
+/* ================= LOCATION ================= */
+let start=null,end=null,route=null;
+let marker=null,follow=true;
+let lastPos=null;
+
 navigator.geolocation.watchPosition(p=>{
   start=L.latLng(p.coords.latitude,p.coords.longitude);
   if(!marker) marker=L.marker(start).addTo(map);
   else marker.setLatLng(start);
+
+  if(follow) map.setView(start,17,{animate:true});
+  if(route) route.setWaypoints([start,end]);
 },{},{enableHighAccuracy:true});
 
-function locate(){
-  if(start) map.setView(start,17,{animate:true});
+/* ================= VOICE ================= */
+function speak(t){
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang=navigator.language.startsWith("ar")?"ar":"en";
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
 }
 
-/* ===== SEARCH ===== */
-const search=document.getElementById("search");
-const results=document.getElementById("results");
-
-search.oninput=()=>{
-  if(search.value.length<3){results.innerHTML="";return;}
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${search.value}`)
-  .then(r=>r.json()).then(d=>{
-    results.innerHTML="";
-    d.slice(0,5).forEach(p=>{
-      const div=document.createElement("div");
-      div.innerText=p.display_name;
-      div.onclick=()=>{
-        end=L.latLng(p.lat,p.lon);
-        map.setView(end,15);
-        results.innerHTML="";
-        document.getElementById("title").innerText=p.display_name;
-      };
-      results.appendChild(div);
-    });
-  });
-};
-
-/* ===== NAVIGATION ===== */
-function startNav(){
-  if(!start||!end){alert("اختر وجهة");return;}
+/* ================= NAVIGATION ================= */
+map.on("click",e=>{
+  end=e.latlng;
   if(route) map.removeControl(route);
+
   route=L.Routing.control({
     waypoints:[start,end],
     router:L.Routing.osrmv1(),
@@ -150,18 +105,34 @@ function startNav(){
   })
   .on("routesfound",e=>{
     const r=e.routes[0];
-    document.getElementById("info").innerText=
-      `المتبقي ${(r.summary.totalDistance/1000).toFixed(1)} كم – ${(r.summary.totalTime/60).toFixed(0)} دقيقة`;
+    document.getElementById("eta").innerText=
+      `المتبقي ${(r.summary.totalDistance/1000).toFixed(1)} كم | ${(r.summary.totalTime/60).toFixed(0)} د`;
+
+    r.instructions.forEach(i=>{
+      if(i.distance<100) speak("بعد مئة متر " + i.text);
+      if(i.distance<50) speak("الآن " + i.text);
+    });
   })
   .addTo(map);
+});
+
+/* ================= FOLLOW ================= */
+function toggleFollow(){
+  follow=!follow;
+  speak(follow?"تم تشغيل التتبع":"تم إيقاف التتبع");
 }
 
-/* ===== ARROW ===== */
+/* ================= ARROW ================= */
 window.addEventListener("deviceorientation",e=>{
   if(e.alpha)
     document.getElementById("arrow").style.transform=
       `translate(-50%,-50%) rotate(${e.alpha}deg)`;
 });
+
+/* ================= OFFLINE (PWA CACHE) ================= */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
 </script>
 
 </body>
