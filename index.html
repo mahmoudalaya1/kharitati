@@ -16,13 +16,15 @@ html,body{
   overflow:hidden;
   font-family:Arial
 }
+
+/* الخريطة */
 #map{
   position:fixed;
   inset:0;
-  z-index:1
+  z-index:1;
 }
 
-/* Search */
+/* شريط البحث (لا يلتقط النقر) */
 #searchBar{
   position:fixed;
   top:12px;
@@ -34,17 +36,18 @@ html,body{
   padding:12px 16px;
   border-radius:30px;
   box-shadow:0 4px 12px rgba(0,0,0,.3);
-  z-index:1000
+  z-index:1000;
+  pointer-events:none;
 }
 #searchBar input{
   width:100%;
   border:none;
   outline:none;
-  font-size:16px
+  font-size:16px;
+  pointer-events:auto;
 }
-#results{font-size:14px}
 
-/* Bottom bar */
+/* الشريط السفلي (لا يلتقط النقر) */
 #bottom{
   position:fixed;
   bottom:0;
@@ -54,18 +57,19 @@ html,body{
   border-radius:22px 22px 0 0;
   box-shadow:0 -4px 20px rgba(0,0,0,.3);
   padding:10px;
-  z-index:1000
+  z-index:1000;
+  pointer-events:none;
 }
-#info{text-align:center;font-size:14px;margin-bottom:6px}
-#bottom .row{
-  display:flex;
-  justify-content:space-around
-}
-#bottom button{
+#bottom .row button{
   background:none;
   border:none;
   font-size:22px;
-  cursor:pointer
+  pointer-events:auto;
+}
+#info{
+  text-align:center;
+  font-size:14px;
+  margin-bottom:6px;
 }
 </style>
 </head>
@@ -75,19 +79,13 @@ html,body{
 <div id="map"></div>
 
 <div id="searchBar">
-  <input id="search" placeholder="ابحث عن مكان">
-  <div id="results"></div>
+  <input placeholder="ابحث عن مكان (اختياري)">
 </div>
 
 <div id="bottom">
-  <div id="info">حدد وجهة</div>
+  <div id="info">اضغط على الخريطة لتحديد الوجهة</div>
   <div class="row">
-    <button onclick="setMode('car')">🚗</button>
-    <button onclick="setMode('pedestrian')">🚶</button>
-    <button onclick="setMode('bicycle')">🚴</button>
-    <button onclick="toggleTraffic()">🚦</button>
     <button onclick="startNav()">▶️</button>
-    <button onclick="locate()">📍</button>
   </div>
 </div>
 
@@ -95,7 +93,7 @@ html,body{
 /* ===== HERE KEY ===== */
 const HERE_API_KEY = "PUT_YOUR_API_KEY_HERE";
 
-/* ===== MAP (OSM BASE) ===== */
+/* ===== MAP ===== */
 const map = L.map("map").setView([36.2,37.13],13);
 
 L.tileLayer(
@@ -104,30 +102,44 @@ L.tileLayer(
 ).addTo(map);
 
 /* ===== STATE ===== */
-let start=null,end=null,marker=null,routeLine=null,mode="car";
-let trafficLayer=null;
+let start=null;
+let end=null;
+let startMarker=null;
+let endMarker=null;
+let routeLine=null;
 
 /* ===== GPS ===== */
-navigator.geolocation.watchPosition(
+navigator.geolocation.getCurrentPosition(
   p=>{
     start=[p.coords.latitude,p.coords.longitude];
-    if(!marker) marker=L.marker(start).addTo(map);
-    else marker.setLatLng(start);
+    startMarker=L.marker(start).addTo(map);
     map.setView(start,16);
   },
   ()=>alert("لم يتم السماح بالموقع"),
   {enableHighAccuracy:true}
 );
 
-/* ===== ROUTING (HERE) ===== */
-function setMode(m){mode=m;}
+/* ===== CLICK TO SET DESTINATION (مهم) ===== */
+map.on("click", e=>{
+  end=[e.latlng.lat, e.latlng.lng];
 
+  if(endMarker) map.removeLayer(endMarker);
+  endMarker=L.marker(end,{title:"الوجهة"}).addTo(map);
+
+  document.getElementById("info").innerText =
+    "تم تحديد الوجهة ✔️ اضغط ▶️ لبدء الملاحة";
+});
+
+/* ===== ROUTING ===== */
 function startNav(){
-  if(!start||!end){
-    alert("حدد وجهة");
+  if(!start || !end){
+    alert("حدد وجهة على الخريطة أولًا");
     return;
   }
-  fetch(`https://router.hereapi.com/v8/routes?transportMode=${mode}&origin=${start[0]},${start[1]}&destination=${end[0]},${end[1]}&return=polyline,summary&apiKey=${HERE_API_KEY}`)
+
+  fetch(
+    `https://router.hereapi.com/v8/routes?transportMode=car&origin=${start[0]},${start[1]}&destination=${end[0]},${end[1]}&return=polyline,summary&apiKey=${HERE_API_KEY}`
+  )
   .then(r=>r.json())
   .then(d=>{
     if(routeLine) map.removeLayer(routeLine);
@@ -135,51 +147,10 @@ function startNav(){
     routeLine=L.polyline(decode(s.polyline),{
       color:"#1976d2",weight:6
     }).addTo(map);
-    document.getElementById("info").innerText=
-      `المتبقي ${(s.summary.length/1000).toFixed(1)} كم – ${(s.summary.duration/60).toFixed(0)} دقيقة`;
+
+    document.getElementById("info").innerText =
+      `المتبقي ${(s.summary.length/1000).toFixed(1)} كم`;
   });
-}
-
-/* ===== CLICK DEST ===== */
-map.on("click",e=>{
-  end=[e.latlng.lat,e.latlng.lng];
-  document.getElementById("info").innerText="اضغط ▶️ لبدء الملاحة";
-});
-
-/* ===== SEARCH (HERE) ===== */
-const search=document.getElementById("search");
-const results=document.getElementById("results");
-
-search.oninput=()=>{
-  if(search.value.length<3){results.innerHTML="";return;}
-  fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${search.value}&apiKey=${HERE_API_KEY}`)
-  .then(r=>r.json())
-  .then(d=>{
-    results.innerHTML="";
-    d.items.slice(0,5).forEach(p=>{
-      const div=document.createElement("div");
-      div.textContent=p.title;
-      div.onclick=()=>{
-        end=[p.position.lat,p.position.lng];
-        map.setView(end,15);
-        results.innerHTML="";
-        document.getElementById("info").innerText="اضغط ▶️ لبدء الملاحة";
-      };
-      results.appendChild(div);
-    });
-  });
-};
-
-/* ===== TRAFFIC (HERE OVERLAY) ===== */
-function toggleTraffic(){
-  if(!trafficLayer){
-    trafficLayer=L.tileLayer(
-      "https://maps.hereapi.com/v3/traffic/flow/mc/{z}/{x}/{y}/png8?apiKey="+HERE_API_KEY
-    ).addTo(map);
-  }else{
-    map.removeLayer(trafficLayer);
-    trafficLayer=null;
-  }
 }
 
 /* ===== POLYLINE DECODE ===== */
@@ -196,11 +167,8 @@ function decode(t){
   }
   return p;
 }
-
-function locate(){
-  if(start) map.setView(start,16);
-}
 </script>
 
 </body>
 </html>
+ر
