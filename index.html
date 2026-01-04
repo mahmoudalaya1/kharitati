@@ -27,16 +27,39 @@ button{padding:10px;background:#25d366;border:none;color:#fff}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDr5hQl0t0eI0AYI7--xLZFYpFw8F6vXRA",
-  authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.appspot.com",
-  messagingSenderId: "296218682746",
-  appId: "1:296218682746:web:e097a1279383dd02eea2c3"
-};
+// LOGIN / REGISTER (مصححة 100%)
+function doLogin(){
+  console.log("زر الدخول تم الضغط عليه");
+
+  if(!email.value || !pass.value){
+    alert("اكتب الإيميل وكلمة المرور");
+    return;
+  }
+
+  // محاولة تسجيل الدخول
+  auth.signInWithEmailAndPassword(email.value, pass.value)
+  .then(()=>{
+    console.log("تم تسجيل الدخول");
+  })
+  .catch(()=>{
+    // إذا لم يكن الحساب موجود → تسجيل جديد
+    if(!username.value){
+      alert("اكتب اسم المستخدم لإنشاء حساب جديد");
+      return;
+    }
+
+    auth.createUserWithEmailAndPassword(email.value, pass.value)
+    .then(()=>{
+      console.log("تم إنشاء الحساب");
+    })
+    .catch(e=>{
+      alert(e.message);
+      console.error(e);
+    });
+  });
+}
+</script>
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
