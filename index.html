@@ -5,7 +5,6 @@
 <title>Kharitati Maps</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -28,21 +27,6 @@ html,body{margin:0;padding:0;height:100%;font-family:Arial}
   box-shadow:0 4px 12px rgba(0,0,0,.3);
   cursor:pointer;
 }
-#toast{
-  position:fixed;
-  bottom:110px;
-  left:50%;
-  transform:translateX(-50%);
-  background:#333;
-  color:#fff;
-  padding:10px 16px;
-  border-radius:14px;
-  font-size:14px;
-  opacity:0;
-  transition:.3s;
-  z-index:5000;
-}
-#toast.show{opacity:1}
 
 /* Bottom bar */
 #bottom{
@@ -59,22 +43,19 @@ html,body{margin:0;padding:0;height:100%;font-family:Arial}
 button{background:none;border:none;font-size:22px;cursor:pointer}
 .active{color:#1976d2;font-weight:bold}
 
-/* Offer */
-.offer-badge{
-  background:white;
-  padding:4px 6px;
-  border-radius:10px;
-  box-shadow:0 2px 6px rgba(0,0,0,.3);
-  font-size:12px;
+/* سهم الاتجاه */
+.arrow{
+  width:0;height:0;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-bottom:22px solid #1976d2;
 }
 </style>
 </head>
-<div id="toast"></div>
 
 <body>
 
 <button id="locateBtn" onclick="enableGPS()">📍</button>
-
 <div id="map"></div>
 
 <div id="bottom">
@@ -96,16 +77,14 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
 
 <script>
 /* ================= FIREBASE ================= */
-const firebaseConfig = {
+firebase.initializeApp({
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
   projectId: "kharitati-5cb37",
   storageBucket: "kharitati-5cb37.firebasestorage.app",
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
-};
-
-firebase.initializeApp(firebaseConfig);
+});
 firebase.auth().signInAnonymously();
 const db = firebase.firestore();
 
@@ -115,36 +94,39 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).a
 
 /* ================= STATE ================= */
 let start=null,end=null;
-let startMarker=null,endMarker=null,routeLine=null;
+let arrowMarker=null,endMarker=null,routeLine=null;
 let follow=true;
 let mode="foot";
+let lastPos=null;
 
-/* ================= GPS ================= */
+/* ================= GPS + ARROW ================= */
 function enableGPS(){
-  if(!navigator.geolocation){
-    alert("المتصفح لا يدعم GPS");
-    return;
-  }
+  navigator.geolocation.watchPosition(p=>{
+    start=[p.coords.latitude,p.coords.longitude];
 
-  navigator.geolocation.watchPosition(
-    p=>{
-      start=[p.coords.latitude,p.coords.longitude];
+    if(!arrowMarker){
+      arrowMarker = L.marker(start,{
+        icon:L.divIcon({className:"arrow"})
+      }).addTo(map);
+    }else{
+      arrowMarker.setLatLng(start);
+    }
 
-      if(!startMarker){
-        startMarker=L.marker(start).addTo(map).bindPopup("موقعي");
-      }else{
-        startMarker.setLatLng(start);
-      }
+    if(lastPos){
+      const angle = Math.atan2(
+        start[1]-lastPos[1],
+        start[0]-lastPos[0]
+      ) * 180 / Math.PI;
 
-      if(follow) map.setView(start,17);
-      info.innerText="📍 تم تحديد موقعك";
-    },
-    err=>{
-      alert("❌ لازم تسمح بالموقع من المتصفح");
-      console.error(err);
-    },
-    {enableHighAccuracy:true}
-  );
+      arrowMarker.getElement().style.transform =
+        `rotate(${angle}deg)`;
+    }
+
+    lastPos=[...start];
+
+    if(follow) map.setView(start,17);
+    info.innerText="📍 GPS يعمل (حي)";
+  },()=>alert("اسمح بالموقع"),{enableHighAccuracy:true});
 }
 
 /* ================= FOLLOW ================= */
@@ -168,25 +150,21 @@ function setMode(m){
 map.on("click",e=>{
   end=[e.latlng.lat,e.latlng.lng];
   if(endMarker) map.removeLayer(endMarker);
-  endMarker=L.marker(end).addTo(map).bindPopup("الوجهة");
+  endMarker=L.marker(end).addTo(map);
   info.innerText="📍 تم اختيار الوجهة";
 });
 
 /* ================= ROUTE ================= */
 function startNav(){
   if(!start||!end){alert("حدد موقعك والوجهة");return;}
-
   const profile=mode==="car"?"driving":"foot";
-  const url=`https://router.project-osrm.org/route/v1/${profile}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
-
-  fetch(url).then(r=>r.json()).then(d=>{
-    if(d.code!=="Ok"){alert("لا يوجد مسار");return;}
+  fetch(`https://router.project-osrm.org/route/v1/${profile}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`)
+  .then(r=>r.json()).then(d=>{
     if(routeLine) map.removeLayer(routeLine);
     routeLine=L.geoJSON(d.routes[0].geometry,{style:{color:"#1976d2",weight:6}}).addTo(map);
     info.innerText="▶️ الملاحة بدأت";
   });
 }
-
 function cancelNav(){
   if(routeLine) map.removeLayer(routeLine);
   if(endMarker) map.removeLayer(endMarker);
@@ -197,23 +175,15 @@ function cancelNav(){
 /* ================= OFFERS ================= */
 function addOffer(){
   if(!start){alert("شغّل GPS أولاً");return;}
-
-  const title=prompt("اكتب وصف العرض:");
-  if(!title) return;
-
-  db.collection("offers").add({
-    title,
-    lat:start[0],
-    lng:start[1],
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
+  const title=prompt("وصف العرض:");
+  if(!title)return;
+  db.collection("offers").add({title,lat:start[0],lng:start[1]});
 }
-
-db.collection("offers").onSnapshot(snap=>{
-  snap.docChanges().forEach(c=>{
+db.collection("offers").onSnapshot(s=>{
+  s.docChanges().forEach(c=>{
     if(c.type==="added"){
       const o=c.doc.data();
-      L.marker([o.lat,o.lng]).addTo(map).bindPopup("📢 "+o.title);
+      L.marker([o.lat,o.lng]).addTo(map).bindPopup(o.title);
     }
   });
 });
