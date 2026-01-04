@@ -5,36 +5,68 @@
 <title>خريطتي</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet"
-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<link rel="stylesheet"
-href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+<!-- Geocoder -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css">
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+<!-- Routing -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css">
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <style>
 html,body{margin:0;height:100%;font-family:Arial}
 #map{height:100vh}
+
+/* لوحة التحكم */
+#panel{
+  position:absolute;
+  top:15px;
+  left:15px;
+  background:#fff;
+  padding:12px;
+  border-radius:12px;
+  width:260px;
+  z-index:1000;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);
+}
+
+#panel h3{margin:0 0 8px 0}
+
+#panel button{
+  width:100%;
+  padding:9px;
+  margin-top:6px;
+  border:none;
+  border-radius:8px;
+  background:#1976d2;
+  color:#fff;
+  cursor:pointer;
+  font-size:14px;
+}
+
+#panel button.gray{background:#555}
 
 /* زر الحساب */
 #accountBtn{
   position:fixed;
   bottom:20px;
   right:20px;
-  width:55px;
-  height:55px;
+  width:56px;
+  height:56px;
   border-radius:50%;
+  border:none;
   background:#1976d2;
   color:#fff;
   font-size:26px;
-  border:none;
   cursor:pointer;
-  z-index:1000;
+  z-index:1200;
 }
 
-/* نافذة الدخول */
+/* نافذة الحساب */
 #loginBox{
   position:fixed;
   inset:0;
@@ -49,97 +81,139 @@ html,body{margin:0;height:100%;font-family:Arial}
   background:#fff;
   padding:20px;
   width:280px;
-  border-radius:10px;
+  border-radius:12px;
   text-align:center;
 }
 
-input,button{
+#loginBox input{
   width:100%;
-  padding:10px;
+  padding:9px;
   margin-top:6px;
 }
 
-button.main{
-  background:#1976d2;
-  color:white;
-  border:none;
-  border-radius:6px;
-}
-
-button.gray{
-  background:#555;
-  color:white;
-  border:none;
-  border-radius:6px;
-}
 </style>
 </head>
 
 <body>
 
-<!-- نافذة الدخول -->
+<div id="panel">
+  <h3>🚗 الملاحة</h3>
+  <button onclick="useMyLocation()">📍 موقعي كنقطة بداية</button>
+  <button onclick="selectStart()">اختيار نقطة البداية</button>
+  <button onclick="selectEnd()">اختيار نقطة الوصول</button>
+  <button onclick="startRouting()">ابدأ الملاحة</button>
+  <button class="gray" onclick="clearRoute()">مسح المسار</button>
+</div>
+
+<button id="accountBtn" onclick="openLogin()">👤</button>
+
+<!-- نافذة الحساب -->
 <div id="loginBox">
   <div class="box">
     <h3>الحساب</h3>
     <input id="email" placeholder="البريد الإلكتروني">
     <input id="password" type="password" placeholder="كلمة المرور">
-    <button class="main" onclick="login()">دخول</button>
-    <button class="main" onclick="register()">إنشاء حساب</button>
+    <button onclick="login()">دخول</button>
+    <button onclick="register()">إنشاء حساب</button>
     <button class="gray" onclick="logout()">تسجيل خروج</button>
     <button onclick="closeLogin()">إغلاق</button>
   </div>
 </div>
 
-<button id="accountBtn" onclick="openLogin()">👤</button>
-
 <div id="map"></div>
 
 <script>
-/* خريطة */
+/* إنشاء الخريطة */
 const map = L.map('map').setView([36.2021,37.1343],13);
 
-const normal = L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{attribution:'© OpenStreetMap'}
+L.tileLayer(
+  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {attribution:'© OpenStreetMap'}
 ).addTo(map);
 
-const terrain = L.tileLayer(
-'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
-);
-
+/* بحث */
 L.Control.geocoder({defaultMarkGeocode:true}).addTo(map);
 
-/* تدوير (شكلي) */
-let angle=0;
-map.on("contextmenu",()=>{
-  angle+=15;
-  document.getElementById("map").style.transform=`rotate(${angle}deg)`
+/* نقاط الملاحة */
+let startPoint=null;
+let endPoint=null;
+let routing=null;
+let selecting=null;
+
+/* تحديد موقعي */
+function useMyLocation(){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    startPoint = L.latLng(pos.coords.latitude,pos.coords.longitude);
+    map.setView(startPoint,15);
+    L.marker(startPoint).addTo(map).bindPopup("موقعي").openPopup();
+  },()=>alert("لم يتم السماح بتحديد الموقع"));
+}
+
+/* اختيار نقاط */
+function selectStart(){
+  selecting="start";
+  alert("اضغط على الخريطة لاختيار نقطة البداية");
+}
+function selectEnd(){
+  selecting="end";
+  alert("اضغط على الخريطة لاختيار نقطة الوصول");
+}
+
+map.on("click",e=>{
+  if(selecting==="start"){
+    startPoint=e.latlng;
+    L.marker(startPoint).addTo(map).bindPopup("بداية").openPopup();
+  }
+  if(selecting==="end"){
+    endPoint=e.latlng;
+    L.marker(endPoint).addTo(map).bindPopup("وصول").openPopup();
+  }
+  selecting=null;
 });
 
-/* دخول محلي (تجريبي) */
+/* بدء الملاحة */
+function startRouting(){
+  if(!startPoint||!endPoint)
+    return alert("حدد نقطة البداية والوصول");
+
+  if(routing) map.removeControl(routing);
+
+  routing = L.Routing.control({
+    waypoints:[startPoint,endPoint],
+    routeWhileDragging:false,
+    show:false,
+    addWaypoints:false
+  }).addTo(map);
+}
+
+/* مسح */
+function clearRoute(){
+  if(routing) map.removeControl(routing);
+  routing=null;
+  startPoint=null;
+  endPoint=null;
+  map.eachLayer(l=>{
+    if(l instanceof L.Marker) map.removeLayer(l);
+  });
+}
+
+/* حساب (تجريبي محلي) */
 function login(){
-  if(!email.value||!password.value)
-    return alert("املأ الحقول");
+  if(!email.value||!password.value) return alert("املأ الحقول");
   localStorage.setItem("user",email.value);
   alert("تم تسجيل الدخول");
   closeLogin();
 }
-
-function register(){
-  login();
-}
-
+function register(){login();}
 function logout(){
   localStorage.removeItem("user");
   alert("تم تسجيل الخروج");
 }
-
 function openLogin(){
-  document.getElementById("loginBox").style.display="flex";
+  loginBox.style.display="flex";
 }
-
 function closeLogin(){
-  document.getElementById("loginBox").style.display="none";
+  loginBox.style.display="none";
 }
 </script>
 
