@@ -31,7 +31,7 @@ html,body,#map{height:100%;margin:0;font-family:Arial}
 #arrow{
   position:absolute;left:50%;top:50%;
   transform:translate(-50%,-50%);
-  font-size:42px;z-index:998
+  font-size:42px;z-index:998;pointer-events:none
 }
 
 /* Bottom Bar */
@@ -40,18 +40,18 @@ html,body,#map{height:100%;margin:0;font-family:Arial}
   width:100%;background:white;
   border-radius:22px 22px 0 0;
   box-shadow:0 -4px 20px rgba(0,0,0,.3);
-  padding:12px;
+  padding:10px;
   z-index:999
 }
 #bottom .row{
   display:flex;justify-content:space-around;
-  align-items:center;margin-top:6px
+  align-items:center
 }
 #bottom button{
   background:none;border:none;
-  font-size:22px
+  font-size:22px;cursor:pointer
 }
-#info{font-size:14px;text-align:center;margin-top:4px}
+#info{text-align:center;font-size:14px;margin-bottom:6px}
 </style>
 </head>
 
@@ -68,7 +68,7 @@ html,body,#map{height:100%;margin:0;font-family:Arial}
 
 <!-- Bottom Bar -->
 <div id="bottom">
-  <div id="info">جاهز للملاحة</div>
+  <div id="info">اضغط على الخريطة لتحديد وجهة</div>
   <div class="row">
     <button onclick="setMode('car')">🚗</button>
     <button onclick="setMode('foot')">🚶</button>
@@ -81,28 +81,33 @@ html,body,#map{height:100%;margin:0;font-family:Arial}
 </div>
 
 <script>
-/* MAP */
-const map=L.map("map",{zoomControl:false}).setView([36.2,37.13],15);
-const normal=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-const traffic=L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png");
+/* ================= MAP ================= */
+const map = L.map("map",{zoomControl:false}).setView([36.2,37.13],15);
+const normal = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+const traffic = L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png");
 
-/* STATE */
+/* ================= STATE ================= */
 let start=null,end=null,route=null,marker=null;
 let mode="car",follow=true,trafficOn=false;
 
-/* LOCATION */
-navigator.geolocation.watchPosition(p=>{
-  start=L.latLng(p.coords.latitude,p.coords.longitude);
-  if(!marker) marker=L.marker(start).addTo(map);
-  else marker.setLatLng(start);
-  if(follow) map.setView(start,17,{animate:true});
-  if(route) route.setWaypoints([start,end]);
-},{},{enableHighAccuracy:true});
+/* ================= LOCATION ================= */
+navigator.geolocation.watchPosition(
+  p=>{
+    start = L.latLng(p.coords.latitude,p.coords.longitude);
+    if(!marker) marker=L.marker(start).addTo(map);
+    else marker.setLatLng(start);
 
-/* MODES */
+    if(follow) map.setView(start,17,{animate:true});
+    if(route && end) route.setWaypoints([start,end]);
+  },
+  ()=>alert("لم يتم السماح بتحديد الموقع"),
+  {enableHighAccuracy:true}
+);
+
+/* ================= MODES ================= */
 function setMode(m){
   mode=m;
-  if(start&&end) drawRoute();
+  if(start && end) drawRoute();
 }
 function profile(){
   if(mode==="foot") return "foot";
@@ -110,62 +115,78 @@ function profile(){
   return "car";
 }
 
-/* ROUTING */
+/* ================= ROUTING ================= */
 function startNav(){
-  if(!start||!end){alert("اختر وجهة");return;}
+  if(!start || !end){
+    alert("حدد وجهة أولاً (اضغط على الخريطة أو ابحث)");
+    return;
+  }
   drawRoute();
 }
 function drawRoute(){
   if(route) map.removeControl(route);
-  route=L.Routing.control({
+  route = L.Routing.control({
     waypoints:[start,end],
     router:L.Routing.osrmv1({profile:profile()}),
     addWaypoints:false,
     show:false
-  }).on("routesfound",e=>{
+  })
+  .on("routesfound",e=>{
     const r=e.routes[0];
-    document.getElementById("info").innerText=
-      `المتبقي ${(r.summary.totalDistance/1000).toFixed(1)} كم – ${(r.summary.totalTime/60).toFixed(0)} د`;
-  }).addTo(map);
+    document.getElementById("info").innerText =
+      `المتبقي ${(r.summary.totalDistance/1000).toFixed(1)} كم – ${(r.summary.totalTime/60).toFixed(0)} دقيقة`;
+  })
+  .addTo(map);
 }
+
+/* ================= MAP CLICK ================= */
 map.on("click",e=>{
-  end=e.latlng;
+  end = e.latlng;
+  document.getElementById("info").innerText="اضغط ▶️ لبدء الملاحة";
 });
 
-/* TOOLS */
-function locate(){ if(start) map.setView(start,17,{animate:true}); }
-function toggleFollow(){ follow=!follow; }
+/* ================= TOOLS ================= */
+function locate(){
+  if(start) map.setView(start,17,{animate:true});
+}
+function toggleFollow(){
+  follow=!follow;
+}
 function toggleTraffic(){
-  trafficOn?map.removeLayer(traffic):map.addLayer(traffic);
+  trafficOn ? map.removeLayer(traffic) : map.addLayer(traffic);
   trafficOn=!trafficOn;
 }
 
-/* SEARCH */
+/* ================= SEARCH ================= */
 const search=document.getElementById("search");
 const results=document.getElementById("results");
+
 search.oninput=()=>{
   if(search.value.length<3){results.innerHTML="";return;}
   fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${search.value}`)
-  .then(r=>r.json()).then(d=>{
+  .then(r=>r.json())
+  .then(d=>{
     results.innerHTML="";
     d.slice(0,5).forEach(p=>{
       const div=document.createElement("div");
-      div.innerText=p.display_name;
+      div.textContent=p.display_name;
       div.onclick=()=>{
         end=L.latLng(p.lat,p.lon);
         map.setView(end,15);
         results.innerHTML="";
+        document.getElementById("info").innerText="اضغط ▶️ لبدء الملاحة";
       };
       results.appendChild(div);
     });
   });
 };
 
-/* ARROW */
+/* ================= ARROW ================= */
 window.addEventListener("deviceorientation",e=>{
-  if(e.alpha)
-    document.getElementById("arrow").style.transform=
+  if(e.alpha){
+    document.getElementById("arrow").style.transform =
       `translate(-50%,-50%) rotate(${e.alpha}deg)`;
+  }
 });
 </script>
 
