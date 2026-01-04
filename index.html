@@ -84,6 +84,62 @@ db.collection("offers").onSnapshot(snapshot=>{
   });
 });
 </script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+/* ================== Firebase Init ================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
+  authDomain: "kharitati-5cb37.firebaseapp.com",
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.firebasestorage.app",
+  messagingSenderId: "296218682746",
+  appId: "1:296218682746:web:650a1161841ea510eea2c3",
+  measurementId: "G-6FJPYRVM0W"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+/* ================== Auth ================== */
+auth.signInAnonymously().then(()=>{
+  console.log("Firebase auth OK");
+});
+
+/* ================== Load offers on map ================== */
+db.collection("offers").onSnapshot(snapshot=>{
+  snapshot.docChanges().forEach(change=>{
+    if(change.type === "added"){
+      const o = change.doc.data();
+      if(o.lat && o.lng){
+        L.marker([o.lat, o.lng])
+          .addTo(map)
+          .bindPopup(o.title || "عرض");
+      }
+    }
+  });
+});
+
+/* ================== Add offer function ================== */
+function addOffer(title, lat, lng){
+  db.collection("offers").add({
+    title: title,
+    lat: lat,
+    lng: lng,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{
+    alert("تم إضافة العرض ✅");
+  }).catch(err=>{
+    console.error(err);
+    alert("خطأ Firebase");
+  });
+}
+</script>
 
 <body>
 
