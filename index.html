@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>Chat Demo</title>
+<title>Chat Friends</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -14,34 +14,33 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .sidebar{width:30%;background:#fff;border-left:1px solid #ccc}
 .messages{flex:1;display:flex;flex-direction:column}
 .header{background:#075e54;color:#fff;padding:10px}
-.list{padding:10px}
+.list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
+.list div:hover{background:#f0f0f0}
 .msgs{flex:1;padding:10px;overflow:auto}
 .msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
 .input{display:flex}
-input{flex:1;padding:10px;border:none}
+input{flex:1;padding:10px}
 button{padding:10px;background:#25d366;border:none;color:#fff}
 </style>
 
-<!-- Firebase compat -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  // 🔥 Firebase config (من عندك)
-  const firebaseConfig = {
-    apiKey: "AIzaSyDr5hQl0t0eI0AYI7--xLZFYpFw8F6vXRA",
-    authDomain: "kharitati-5cb37.firebaseapp.com",
-    projectId: "kharitati-5cb37",
-    storageBucket: "kharitati-5cb37.appspot.com",
-    messagingSenderId: "296218682746",
-    appId: "1:296218682746:web:e097a1279383dd02eea2c3"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyDr5hQl0t0eI0AYI7--xLZFYpFw8F6vXRA",
+  authDomain: "kharitati-5cb37.firebaseapp.com",
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.appspot.com",
+  messagingSenderId: "296218682746",
+  appId: "1:296218682746:web:e097a1279383dd02eea2c3"
+};
 
-  firebase.initializeApp(firebaseConfig);
-
-  const auth = firebase.auth();
-  const db   = firebase.firestore();
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 </script>
 </head>
 
@@ -50,22 +49,27 @@ button{padding:10px;background:#25d366;border:none;color:#fff}
 <!-- LOGIN -->
 <div class="login" id="login">
   <div class="box">
-    <h3>تسجيل الدخول</h3>
+    <h3>تسجيل</h3>
     <input id="email" placeholder="email"><br><br>
     <input id="pass" type="password" placeholder="password"><br><br>
-    <button onclick="login()">دخول</button>
+    <input id="username" placeholder="اسم المستخدم"><br><br>
+    <button onclick="login()">دخول / تسجيل</button>
   </div>
 </div>
 
 <!-- CHAT -->
 <div class="chat" id="chat">
   <div class="sidebar">
-    <div class="header">المحادثات</div>
-    <div class="list">💬 دردشة عامة</div>
+    <div class="header">الأصدقاء</div>
+    <div style="padding:10px">
+      <input id="friendName" placeholder="اسم صديق">
+      <button onclick="addFriend()">➕</button>
+    </div>
+    <div class="list" id="friends"></div>
   </div>
 
   <div class="messages">
-    <div class="header" id="userHeader"></div>
+    <div class="header" id="chatHeader">اختر صديق</div>
     <div class="msgs" id="msgs"></div>
     <div class="input">
       <input id="text" placeholder="اكتب رسالة">
@@ -75,50 +79,109 @@ button{padding:10px;background:#25d366;border:none;color:#fff}
 </div>
 
 <script>
-auth.onAuthStateChanged(user=>{
-  if(user){
-    loginDiv(false);
-    startChat(user.email);
-    listen();
+let currentChat = null;
+
+// AUTH
+auth.onAuthStateChanged(u=>{
+  if(u){
+    saveUser();
+    showChat();
+    loadFriends();
   }else{
-    loginDiv(true);
+    showLogin();
   }
 });
 
 function login(){
   auth.signInWithEmailAndPassword(email.value, pass.value)
-  .catch(e=>{
+  .catch(()=>{
     auth.createUserWithEmailAndPassword(email.value, pass.value);
   });
 }
 
-function loginDiv(show){
-  document.getElementById("login").style.display = show?"flex":"none";
-  document.getElementById("chat").style.display  = show?"none":"flex";
+function saveUser(){
+  if(!username.value) return;
+  db.collection("users").doc(auth.currentUser.uid).set({
+    email: auth.currentUser.email,
+    username: username.value
+  },{merge:true});
 }
 
-function startChat(user){
-  document.getElementById("userHeader").innerText = "👤 " + user;
+// UI
+function showLogin(){
+  login.style.display="flex";
+  chat.style.display="none";
+}
+function showChat(){
+  login.style.display="none";
+  chat.style.display="flex";
+}
+
+// ADD FRIEND
+async function addFriend(){
+  let name = friendName.value;
+  if(!name) return;
+
+  let q = await db.collection("users").where("username","==",name).get();
+  if(q.empty) return alert("المستخدم غير موجود");
+
+  let friendId = q.docs[0].id;
+  let myId = auth.currentUser.uid;
+
+  let chatId = [myId, friendId].sort().join("_");
+
+  await db.collection("friends").doc(chatId).set({
+    users:[myId,friendId]
+  });
+
+  friendName.value="";
+}
+
+// LOAD FRIENDS
+function loadFriends(){
+  db.collection("friends")
+  .where("users","array-contains",auth.currentUser.uid)
+  .onSnapshot(async s=>{
+    friends.innerHTML="";
+    for(let d of s.docs){
+      let ids = d.data().users;
+      let friendId = ids.find(i=>i!==auth.currentUser.uid);
+      let u = await db.collection("users").doc(friendId).get();
+      let div = document.createElement("div");
+      div.innerText = u.data().username;
+      div.onclick=()=>openChat(d.id,u.data().username);
+      friends.appendChild(div);
+    }
+  });
+}
+
+// CHAT
+function openChat(id,name){
+  currentChat=id;
+  chatHeader.innerText=name;
+  listen();
 }
 
 function send(){
-  if(!text.value) return;
-  db.collection("messages").add({
+  if(!text.value||!currentChat) return;
+  db.collection("chats").doc(currentChat)
+  .collection("messages").add({
     text:text.value,
-    user:auth.currentUser.email,
+    user:auth.currentUser.uid,
     time:Date.now()
   });
   text.value="";
 }
 
 function listen(){
-  db.collection("messages").orderBy("time")
+  db.collection("chats").doc(currentChat)
+  .collection("messages").orderBy("time")
   .onSnapshot(s=>{
     msgs.innerHTML="";
     s.forEach(d=>{
       let m=document.createElement("div");
       m.className="msg";
-      m.innerText=d.data().user+": "+d.data().text;
+      m.innerText=d.data().text;
       msgs.appendChild(m);
     });
   });
