@@ -28,6 +28,21 @@ html,body{margin:0;padding:0;height:100%;font-family:Arial}
   box-shadow:0 4px 12px rgba(0,0,0,.3);
   cursor:pointer;
 }
+#toast{
+  position:fixed;
+  bottom:110px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#333;
+  color:#fff;
+  padding:10px 16px;
+  border-radius:14px;
+  font-size:14px;
+  opacity:0;
+  transition:.3s;
+  z-index:5000;
+}
+#toast.show{opacity:1}
 
 /* Bottom bar */
 #bottom{
@@ -54,6 +69,7 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
 }
 </style>
 </head>
+<div id="toast"></div>
 
 <body>
 
