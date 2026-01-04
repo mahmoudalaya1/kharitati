@@ -81,7 +81,7 @@ const db = firebase.firestore();
 <script>
 let currentChat = null;
 
-// AUTH
+// مراقبة تسجيل الدخول
 auth.onAuthStateChanged(u=>{
   if(u){
     saveUser();
@@ -92,15 +92,28 @@ auth.onAuthStateChanged(u=>{
   }
 });
 
+// ✅ LOGIN مصحح
 function login(){
+  if(!email.value || !pass.value || !username.value){
+    alert("املأ جميع الحقول");
+    return;
+  }
+
   auth.signInWithEmailAndPassword(email.value, pass.value)
-  .catch(()=>{
-    auth.createUserWithEmailAndPassword(email.value, pass.value);
+  .then(()=>console.log("تم تسجيل الدخول"))
+  .catch(err=>{
+    console.warn("محاولة إنشاء حساب", err.message);
+    auth.createUserWithEmailAndPassword(email.value, pass.value)
+    .then(()=>alert("تم إنشاء الحساب"))
+    .catch(e=>{
+      alert("خطأ: " + e.message);
+      console.error(e);
+    });
   });
 }
 
+// حفظ المستخدم
 function saveUser(){
-  if(!username.value) return;
   db.collection("users").doc(auth.currentUser.uid).set({
     email: auth.currentUser.email,
     username: username.value
@@ -127,7 +140,6 @@ async function addFriend(){
 
   let friendId = q.docs[0].id;
   let myId = auth.currentUser.uid;
-
   let chatId = [myId, friendId].sort().join("_");
 
   await db.collection("friends").doc(chatId).set({
