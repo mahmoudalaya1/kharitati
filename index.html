@@ -24,12 +24,12 @@ html,body{margin:0;height:100%;font-family:Arial}
 /* لوحة التحكم */
 #panel{
   position:absolute;
-  top:15px;
-  left:15px;
+  top:10px;
+  left:10px;
   background:#fff;
   padding:12px;
   border-radius:12px;
-  width:260px;
+  width:280px;
   z-index:1000;
   box-shadow:0 4px 12px rgba(0,0,0,.25);
 }
@@ -49,75 +49,37 @@ html,body{margin:0;height:100%;font-family:Arial}
 }
 
 #panel button.gray{background:#555}
+#panel button.poi{background:#388e3c}
 
-/* زر الحساب */
-#accountBtn{
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  width:56px;
-  height:56px;
-  border-radius:50%;
-  border:none;
-  background:#1976d2;
-  color:#fff;
-  font-size:26px;
-  cursor:pointer;
-  z-index:1200;
-}
-
-/* نافذة الحساب */
-#loginBox{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.6);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:2000;
-}
-
-#loginBox .box{
-  background:#fff;
-  padding:20px;
-  width:280px;
-  border-radius:12px;
-  text-align:center;
-}
-
-#loginBox input{
+#searchBox{
   width:100%;
-  padding:9px;
-  margin-top:6px;
+  padding:8px;
+  margin-bottom:6px;
 }
-
 </style>
 </head>
 
 <body>
 
 <div id="panel">
-  <h3>🚗 الملاحة</h3>
+  <h3>🗺️ خريطتي</h3>
+
+  <input id="searchBox" placeholder="ابحث عن مكان">
+
+  <button onclick="searchPlace()">🔍 بحث</button>
+
   <button onclick="useMyLocation()">📍 موقعي كنقطة بداية</button>
-  <button onclick="selectStart()">اختيار نقطة البداية</button>
-  <button onclick="selectEnd()">اختيار نقطة الوصول</button>
-  <button onclick="startRouting()">ابدأ الملاحة</button>
-  <button class="gray" onclick="clearRoute()">مسح المسار</button>
-</div>
+  <button onclick="selectStart()">🚩 اختيار نقطة البداية</button>
+  <button onclick="selectEnd()">🏁 اختيار نقطة الوصول</button>
 
-<button id="accountBtn" onclick="openLogin()">👤</button>
+  <button onclick="startRoute()">🚗 بدء الرحلة</button>
+  <button class="gray" onclick="clearRoute()">❌ مسح المسار</button>
 
-<!-- نافذة الحساب -->
-<div id="loginBox">
-  <div class="box">
-    <h3>الحساب</h3>
-    <input id="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور">
-    <button onclick="login()">دخول</button>
-    <button onclick="register()">إنشاء حساب</button>
-    <button class="gray" onclick="logout()">تسجيل خروج</button>
-    <button onclick="closeLogin()">إغلاق</button>
-  </div>
+  <hr>
+
+  <button class="poi" onclick="searchPOI('fuel')">⛽ وقود</button>
+  <button class="poi" onclick="searchPOI('hotel')">🏨 فندق</button>
+  <button class="poi" onclick="searchPOI('pharmacy')">💊 صيدلية</button>
 </div>
 
 <div id="map"></div>
@@ -128,25 +90,41 @@ const map = L.map('map').setView([36.2021,37.1343],13);
 
 L.tileLayer(
   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {attribution:'© OpenStreetMap'}
+  { attribution:'© OpenStreetMap' }
 ).addTo(map);
 
-/* بحث */
-L.Control.geocoder({defaultMarkGeocode:true}).addTo(map);
+/* البحث الذكي */
+const geocoder = L.Control.geocoder({
+  defaultMarkGeocode:false
+}).addTo(map);
+
+function searchPlace(){
+  geocoder.options.geocoder.geocode(
+    searchBox.value,
+    results=>{
+      if(!results.length) return alert("لم يتم العثور");
+      const r = results[0];
+      map.setView(r.center,15);
+      L.marker(r.center).addTo(map)
+        .bindPopup(r.name).openPopup();
+    }
+  );
+}
 
 /* نقاط الملاحة */
 let startPoint=null;
 let endPoint=null;
-let routing=null;
 let selecting=null;
+let routingControl=null;
+let markers=[];
 
-/* تحديد موقعي */
+/* موقعي الحقيقي */
 function useMyLocation(){
   navigator.geolocation.getCurrentPosition(pos=>{
-    startPoint = L.latLng(pos.coords.latitude,pos.coords.longitude);
+    startPoint=L.latLng(pos.coords.latitude,pos.coords.longitude);
+    addMarker(startPoint,"📍 موقعي");
     map.setView(startPoint,15);
-    L.marker(startPoint).addTo(map).bindPopup("موقعي").openPopup();
-  },()=>alert("لم يتم السماح بتحديد الموقع"));
+  },()=>alert("لم يتم السماح بالموقع"));
 }
 
 /* اختيار نقاط */
@@ -162,58 +140,61 @@ function selectEnd(){
 map.on("click",e=>{
   if(selecting==="start"){
     startPoint=e.latlng;
-    L.marker(startPoint).addTo(map).bindPopup("بداية").openPopup();
+    addMarker(startPoint,"🚩 بداية");
   }
   if(selecting==="end"){
     endPoint=e.latlng;
-    L.marker(endPoint).addTo(map).bindPopup("وصول").openPopup();
+    addMarker(endPoint,"🏁 وصول");
   }
   selecting=null;
 });
 
-/* بدء الملاحة */
-function startRouting(){
+/* إضافة علامة */
+function addMarker(latlng,text){
+  const m=L.marker(latlng).addTo(map).bindPopup(text);
+  markers.push(m);
+}
+
+/* بدء الرحلة */
+function startRoute(){
   if(!startPoint||!endPoint)
-    return alert("حدد نقطة البداية والوصول");
+    return alert("حدد البداية والوصول");
 
-  if(routing) map.removeControl(routing);
+  if(routingControl)
+    map.removeControl(routingControl);
 
-  routing = L.Routing.control({
+  routingControl=L.Routing.control({
     waypoints:[startPoint,endPoint],
     routeWhileDragging:false,
-    show:false,
-    addWaypoints:false
+    addWaypoints:false,
+    show:false
   }).addTo(map);
 }
 
 /* مسح */
 function clearRoute(){
-  if(routing) map.removeControl(routing);
-  routing=null;
+  if(routingControl) map.removeControl(routingControl);
+  routingControl=null;
   startPoint=null;
   endPoint=null;
-  map.eachLayer(l=>{
-    if(l instanceof L.Marker) map.removeLayer(l);
-  });
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
 }
 
-/* حساب (تجريبي محلي) */
-function login(){
-  if(!email.value||!password.value) return alert("املأ الحقول");
-  localStorage.setItem("user",email.value);
-  alert("تم تسجيل الدخول");
-  closeLogin();
-}
-function register(){login();}
-function logout(){
-  localStorage.removeItem("user");
-  alert("تم تسجيل الخروج");
-}
-function openLogin(){
-  loginBox.style.display="flex";
-}
-function closeLogin(){
-  loginBox.style.display="none";
+/* البحث عن أماكن قريبة (POI) */
+function searchPOI(type){
+  if(!map.getCenter()) return;
+
+  const c=map.getCenter();
+  const query=`https://nominatim.openstreetmap.org/search?format=json&q=${type}&limit=10&lat=${c.lat}&lon=${c.lng}`;
+
+  fetch(query)
+    .then(r=>r.json())
+    .then(data=>{
+      data.forEach(p=>{
+        addMarker([p.lat,p.lon],p.display_name);
+      });
+    });
 }
 </script>
 
