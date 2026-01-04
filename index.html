@@ -50,6 +50,31 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
 
 <body>
 
+  <div id="gpsCard" style="
+  position:fixed;
+  top:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:white;
+  padding:14px 18px;
+  border-radius:18px;
+  box-shadow:0 4px 14px rgba(0,0,0,.3);
+  z-index:3000;
+  text-align:center;
+">
+  <b>📍 تشغيل GPS</b><br>
+  <button onclick="enableGPS()" style="
+    margin-top:8px;
+    padding:8px 14px;
+    border:none;
+    border-radius:14px;
+    background:#1976d2;
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+  ">تشغيل</button>
+</div>
+
 <div id="map"></div>
 
 <div id="bottom">
@@ -108,6 +133,11 @@ let startMarker=null,endMarker=null;
 let routeLine=null;
 let mode="foot";
 let follow=true;
+let follow = true;
+
+// إذا لمس المستخدم الخريطة نوقف التتبع
+map.on("dragstart",()=>follow=false);
+map.on("zoomstart",()=>follow=false);
 
 /* ================= GPS ================= */
 navigator.geolocation.watchPosition(p=>{
