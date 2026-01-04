@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <title>Chat Demo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
 body{margin:0;font-family:Arial;background:#ece5dd}
-.login, .chat{display:none;height:100vh}
+.login,.chat{display:none;height:100vh}
 .login{display:flex;align-items:center;justify-content:center}
-.login box{background:#fff;padding:20px;border-radius:10px}
+.box{background:#fff;padding:20px;border-radius:10px}
 .chat{display:flex}
 .sidebar{width:30%;background:#fff;border-left:1px solid #ccc}
 .messages{flex:1;display:flex;flex-direction:column}
@@ -20,28 +21,29 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 input{flex:1;padding:10px;border:none}
 button{padding:10px;background:#25d366;border:none;color:#fff}
 </style>
-</head>
-<!-- Firebase -->
+
+<!-- Firebase compat -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
+  // 🔥 Firebase config (من عندك)
   const firebaseConfig = {
     apiKey: "AIzaSyDr5hQl0t0eI0AYI7--xLZFYpFw8F6vXRA",
     authDomain: "kharitati-5cb37.firebaseapp.com",
     projectId: "kharitati-5cb37",
     storageBucket: "kharitati-5cb37.appspot.com",
     messagingSenderId: "296218682746",
-    appId: "1:296218682746:web:b05761d6833db4aeae2c3"
+    appId: "1:296218682746:web:e097a1279383dd02eea2c3"
   };
 
   firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
 </script>
-
-
-<script>
-  const firebaseConfig = {
+</head>
 
 <body>
 
@@ -49,7 +51,8 @@ button{padding:10px;background:#25d366;border:none;color:#fff}
 <div class="login" id="login">
   <div class="box">
     <h3>تسجيل الدخول</h3>
-    <input id="username" placeholder="اسم المستخدم"><br><br>
+    <input id="email" placeholder="email"><br><br>
+    <input id="pass" type="password" placeholder="password"><br><br>
     <button onclick="login()">دخول</button>
   </div>
 </div>
@@ -72,35 +75,53 @@ button{padding:10px;background:#25d366;border:none;color:#fff}
 </div>
 
 <script>
-let user = localStorage.getItem("user");
-
-if(user){
-  startChat();
-}else{
-  document.getElementById("login").style.display="flex";
-}
+auth.onAuthStateChanged(user=>{
+  if(user){
+    loginDiv(false);
+    startChat(user.email);
+    listen();
+  }else{
+    loginDiv(true);
+  }
+});
 
 function login(){
-  let u = document.getElementById("username").value;
-  if(!u) return alert("ادخل اسم");
-  localStorage.setItem("user",u);
-  startChat();
+  auth.signInWithEmailAndPassword(email.value, pass.value)
+  .catch(e=>{
+    auth.createUserWithEmailAndPassword(email.value, pass.value);
+  });
 }
 
-function startChat(){
-  document.getElementById("login").style.display="none";
-  document.getElementById("chat").style.display="flex";
-  document.getElementById("userHeader").innerText = "👤 " + localStorage.getItem("user");
+function loginDiv(show){
+  document.getElementById("login").style.display = show?"flex":"none";
+  document.getElementById("chat").style.display  = show?"none":"flex";
+}
+
+function startChat(user){
+  document.getElementById("userHeader").innerText = "👤 " + user;
 }
 
 function send(){
-  let text = document.getElementById("text");
   if(!text.value) return;
-  let box = document.createElement("div");
-  box.className="msg";
-  box.innerText = localStorage.getItem("user")+": "+text.value;
-  document.getElementById("msgs").appendChild(box);
+  db.collection("messages").add({
+    text:text.value,
+    user:auth.currentUser.email,
+    time:Date.now()
+  });
   text.value="";
+}
+
+function listen(){
+  db.collection("messages").orderBy("time")
+  .onSnapshot(s=>{
+    msgs.innerHTML="";
+    s.forEach(d=>{
+      let m=document.createElement("div");
+      m.className="msg";
+      m.innerText=d.data().user+": "+d.data().text;
+      msgs.appendChild(m);
+    });
+  });
 }
 </script>
 
