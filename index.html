@@ -5,7 +5,6 @@
 <title>Kharitati Maps</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -69,7 +68,21 @@ html,body{margin:0;height:100%;font-family:Arial}
 #navTitle{font-weight:bold;font-size:16px}
 #navInfo{font-size:14px;color:#666;margin-top:6px}
 
-/* ===== User Arrow ===== */
+/* ===== Weather Box ===== */
+#weatherBox{
+  position:fixed;
+  top:80px;left:50%;
+  transform:translateX(-50%);
+  background:#fff;
+  padding:14px 18px;
+  border-radius:16px;
+  box-shadow:0 6px 20px rgba(0,0,0,.3);
+  display:none;
+  z-index:4000;
+  font-size:14px;
+}
+
+/* ===== Arrow ===== */
 .arrow{
   width:0;height:0;
   border-left:10px solid transparent;
@@ -87,41 +100,47 @@ html,body{margin:0;height:100%;font-family:Arial}
   <input id="searchInput" placeholder="ابحث عن مكان">
 </div>
 
-<!-- Buttons -->
+<!-- Floating Buttons -->
 <div id="fab">
   <button id="locBtn">📍</button>
   <button id="navBtn">▶️</button>
   <button id="shareBtn">📤</button>
+  <button id="weatherBtn">🌦️</button>
+  <button id="tourBtn">🧭</button>
+</div>
+
+<!-- Weather -->
+<div id="weatherBox">
+  <b>الطقس الحالي</b>
+  <div id="weatherInfo" style="margin-top:8px"></div>
 </div>
 
 <!-- Bottom Sheet -->
 <div id="bottomSheet">
   <div id="sheetHandle"></div>
-  <div id="navTitle">جاهز للملاحة</div>
+  <div id="navTitle">جاهز</div>
   <div id="navInfo">حدد موقعك ثم اختر وجهة</div>
 </div>
 
 <div id="map"></div>
 
 <script>
-/* ================= MAP ================= */
+/* ===== Map ===== */
 const map = L.map("map",{zoomControl:true})
-  .setView([41.0476,28.9465],14);
+  .setView([41.05,28.98],14);
 
 L.tileLayer(
   "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
   {maxZoom:19}
 ).addTo(map);
 
-/* ================= STATE ================= */
+/* ===== State ===== */
 let start=null,end=null;
 let arrowMarker=null,endMarker=null,routeLine=null;
-let follow=true;
-let lastPos=null;
-let watchId=null;
+let lastPos=null,watchId=null;
 
-/* ================= GPS + FOLLOW ================= */
-function enableGPS(){
+/* ===== GPS ===== */
+locBtn.onclick=()=>{
   if(watchId) return;
   watchId = navigator.geolocation.watchPosition(p=>{
     start=[p.coords.latitude,p.coords.longitude];
@@ -149,12 +168,12 @@ function enableGPS(){
     }
 
     lastPos=[...start];
-    if(follow) map.setView(start,17);
+    map.setView(start,17);
     navInfo.innerText="📍 تتبع حي مفعّل";
   },()=>alert("اسمح بالموقع"),{enableHighAccuracy:true});
-}
+};
 
-/* ================= DEST ================= */
+/* ===== Destination ===== */
 map.on("click",e=>{
   end=[e.latlng.lat,e.latlng.lng];
   if(endMarker) map.removeLayer(endMarker);
@@ -162,8 +181,8 @@ map.on("click",e=>{
   navInfo.innerText="تم تحديد الوجهة";
 });
 
-/* ================= ROUTE ================= */
-function startNav(){
+/* ===== Route ===== */
+navBtn.onclick=()=>{
   if(!start||!end){alert("حدد موقعك والوجهة");return;}
   fetch(`https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`)
   .then(r=>r.json())
@@ -175,17 +194,17 @@ function startNav(){
     navTitle.innerText="الملاحة بدأت";
     navInfo.innerText="اتبع المسار";
   });
-}
+};
 
-/* ================= SHARE ================= */
-function shareLocation(){
-  if(!start){alert("شغّل GPS");return;}
-  const url=`${location.origin}${location.pathname}?lat=${start[0]}&lng=${start[1]}`;
-  navigator.clipboard.writeText(url);
-  alert("تم نسخ رابط الموقع");
-}
+/* ===== Share ===== */
+shareBtn.onclick=()=>{
+  if(!start) return alert("شغّل GPS");
+  const link=`https://www.google.com/maps?q=${start[0]},${start[1]}`;
+  navigator.clipboard.writeText(link);
+  alert("تم نسخ رابط موقعك");
+};
 
-/* ================= SEARCH ================= */
+/* ===== Search ===== */
 searchInput.addEventListener("keydown",e=>{
   if(e.key==="Enter"){
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchInput.value}`)
@@ -197,11 +216,28 @@ searchInput.addEventListener("keydown",e=>{
   }
 });
 
-/* ================= BUTTONS ================= */
-locBtn.onclick=enableGPS;
-navBtn.onclick=startNav;
-shareBtn.onclick=shareLocation;
+/* ===== Weather ===== */
+weatherBtn.onclick=()=>{
+  if(!start) return alert("شغّل GPS");
+  fetch(`https://api.open-meteo.com/v1/forecast?latitude=${start[0]}&longitude=${start[1]}&current_weather=true`)
+  .then(r=>r.json())
+  .then(d=>{
+    const w=d.current_weather;
+    weatherInfo.innerHTML=`
+      🌡️ ${w.temperature}°C<br>
+      💨 رياح ${w.windspeed} كم/س<br>
+      🧭 اتجاه ${w.winddirection}°
+    `;
+    weatherBox.style.display=
+      weatherBox.style.display==="block"?"none":"block";
+  });
+};
 
+/* ===== Virtual Tour ===== */
+tourBtn.onclick=()=>{
+  const c=map.getCenter();
+  window.open(`https://kartaview.org/map/@${c.lat},${c.lng},18z`,"_blank");
+};
 </script>
 
 </body>
