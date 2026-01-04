@@ -49,6 +49,7 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
   border-left:10px solid transparent;
   border-right:10px solid transparent;
   border-bottom:22px solid #1976d2;
+  transform-origin:center;
 }
 </style>
 </head>
@@ -98,15 +99,28 @@ let arrowMarker=null,endMarker=null,routeLine=null;
 let follow=true;
 let mode="foot";
 let lastPos=null;
+let watchId=null;
 
-/* ================= GPS + ARROW ================= */
+/* ================= GPS + ARROW (مُصحّح) ================= */
 function enableGPS(){
-  navigator.geolocation.watchPosition(p=>{
+  if(!navigator.geolocation){
+    alert("المتصفح لا يدعم GPS");
+    return;
+  }
+
+  if(watchId) return; // منع التكرار
+
+  watchId = navigator.geolocation.watchPosition(p=>{
     start=[p.coords.latitude,p.coords.longitude];
 
     if(!arrowMarker){
       arrowMarker = L.marker(start,{
-        icon:L.divIcon({className:"arrow"})
+        icon: L.divIcon({
+          className:"",
+          html:'<div class="arrow"></div>',
+          iconSize:[22,22],
+          iconAnchor:[11,11]
+        })
       }).addTo(map);
     }else{
       arrowMarker.setLatLng(start);
@@ -118,8 +132,8 @@ function enableGPS(){
         start[0]-lastPos[0]
       ) * 180 / Math.PI;
 
-      arrowMarker.getElement().style.transform =
-        `rotate(${angle}deg)`;
+      const el = arrowMarker.getElement();
+      if(el) el.style.transform = `rotate(${angle}deg)`;
     }
 
     lastPos=[...start];
@@ -177,7 +191,12 @@ function addOffer(){
   if(!start){alert("شغّل GPS أولاً");return;}
   const title=prompt("وصف العرض:");
   if(!title)return;
-  db.collection("offers").add({title,lat:start[0],lng:start[1]});
+  db.collection("offers").add({
+    title,
+    lat:start[0],
+    lng:start[1],
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
 }
 db.collection("offers").onSnapshot(s=>{
   s.docChanges().forEach(c=>{
