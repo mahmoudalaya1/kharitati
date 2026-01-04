@@ -7,191 +7,180 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css">
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <style>
 html,body{margin:0;height:100%;font-family:Arial}
-#map{height:100%;width:100%}
+#map{height:100%}
+
+/* شاشة ترحيب */
+#welcome{
+  position:fixed;inset:0;
+  background:#1976d2;color:white;
+  display:flex;align-items:center;justify-content:center;
+  z-index:9999;text-align:center
+}
+#welcome button{
+  padding:12px 20px;border:none;border-radius:30px;
+  font-size:18px;background:white;color:#1976d2
+}
 
 /* شريط البحث */
-#topBar{
-  position:fixed;
-  top:10px;
-  left:50%;
+#top{
+  position:fixed;top:10px;left:50%;
   transform:translateX(-50%);
-  width:92%;
-  max-width:420px;
-  background:white;
-  border-radius:30px;
+  width:92%;max-width:460px;
+  background:white;border-radius:30px;
   box-shadow:0 4px 12px rgba(0,0,0,.3);
-  padding:8px 12px;
-  z-index:1000;
+  padding:10px;z-index:1000
+}
+#top input{border:none;width:100%;font-size:16px}
+
+/* اقتراحات */
+#sug{background:white;border-radius:12px;display:none}
+
+/* أزرار */
+#btns{
+  position:fixed;right:10px;top:90px;
+  display:flex;flex-direction:column;gap:8px;
+  z-index:1000
+}
+#btns button{
+  border:none;border-radius:14px;
+  padding:12px;font-size:18px;
+  background:#1976d2;color:white
 }
 
-#searchRow{
-  display:flex;
-  gap:8px;
-}
-
-#search{
-  flex:1;
-  border:none;
-  outline:none;
-  font-size:16px;
-}
-
-#searchBtn{
-  background:#1976d2;
-  color:white;
-  border:none;
-  border-radius:50%;
-  width:38px;
-  height:38px;
-  cursor:pointer;
-}
-
-#suggestions{
-  background:white;
-  border-radius:12px;
-  margin-top:6px;
-  display:none;
-  max-height:220px;
-  overflow:auto;
-}
-
-.sug{
-  padding:10px;
-  border-bottom:1px solid #eee;
-  cursor:pointer;
-}
-
-/* الأزرار الجانبية */
-#controls{
-  position:fixed;
-  right:10px;
-  top:90px;
-  z-index:1000;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-
-#controls button{
-  border:none;
-  border-radius:10px;
-  padding:10px;
-  background:#1976d2;
-  color:white;
-  cursor:pointer;
-  font-size:14px;
+/* سهم الاتجاه */
+#compass{
+  position:fixed;bottom:20px;right:20px;
+  font-size:32px
 }
 </style>
 </head>
 
 <body>
 
-<div id="topBar">
-  <div id="searchRow">
-    <input id="search" placeholder="ابحث عن مكان">
-    <button id="searchBtn">🔍</button>
+<div id="welcome">
+  <div>
+    <h1>🗺️ خريطتي</h1>
+    <p>ملاحة ذكية بدون Google</p>
+    <button onclick="startApp()">ابدأ</button>
   </div>
-  <div id="suggestions"></div>
 </div>
 
-<div id="controls">
+<div id="top">
+  <input id="search" placeholder="ابحث عن مكان">
+  <div id="sug"></div>
+</div>
+
+<div id="btns">
   <button onclick="setMode('car')">🚗</button>
   <button onclick="setMode('foot')">🚶‍♂️</button>
   <button onclick="setMode('bike')">🚴</button>
-  <button onclick="toggleCompass()">🧭</button>
+  <button onclick="toggleDark()">🌙</button>
+  <button onclick="savePlace()">⭐</button>
+  <button onclick="setHome()">🏠</button>
+  <button onclick="goHome()">🏡</button>
+  <button onclick="toggleTraffic()">🚦</button>
+  <button onclick="share()">📤</button>
   <button onclick="clearRoute()">❌</button>
 </div>
 
+<div id="compass">🧭</div>
 <div id="map"></div>
 
 <script>
-/* إنشاء الخريطة */
-const map = L.map('map').setView([36.2,37.13],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+/* بدء */
+function startApp(){
+  document.getElementById("welcome").style.display="none";
+}
 
-/* الموقع التلقائي */
-navigator.geolocation.getCurrentPosition(pos=>{
-  start = L.latLng(pos.coords.latitude,pos.coords.longitude);
+/* الخريطة */
+const map=L.map('map').setView([36.2,37.13],13);
+const normal=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+const traffic=L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png');
+
+let darkOn=false,trafficOn=false;
+function toggleDark(){darkOn?map.removeLayer(dark):map.addLayer(dark);darkOn=!darkOn}
+function toggleTraffic(){trafficOn?map.removeLayer(traffic):map.addLayer(traffic);trafficOn=!trafficOn}
+
+/* الموقع */
+let start=null,end=null,route=null,mode="car";
+navigator.geolocation.getCurrentPosition(p=>{
+  start=L.latLng(p.coords.latitude,p.coords.longitude);
   map.setView(start,15);
 });
 
-/* البحث */
-const searchInput = document.getElementById("search");
-const sugBox = document.getElementById("suggestions");
-
-searchInput.addEventListener("input",()=>{
-  const q = searchInput.value.trim();
-  if(q.length < 3){sugBox.style.display="none";return;}
-
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=5`)
-    .then(r=>r.json())
-    .then(data=>{
-      sugBox.innerHTML="";
-      data.forEach(p=>{
-        const d=document.createElement("div");
-        d.className="sug";
-        d.innerText=p.display_name;
-        d.onclick=()=>selectPlace(p);
-        sugBox.appendChild(d);
-      });
-      sugBox.style.display="block";
+/* بحث */
+const search=document.getElementById("search");
+const sug=document.getElementById("sug");
+search.oninput=()=>{
+  if(search.value.length<3){sug.style.display="none";return;}
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${search.value}`)
+  .then(r=>r.json()).then(d=>{
+    sug.innerHTML="";
+    d.slice(0,5).forEach(p=>{
+      const div=document.createElement("div");
+      div.innerText=p.display_name;
+      div.onclick=()=>select(p);
+      sug.appendChild(div);
     });
-});
-
-document.getElementById("searchBtn").onclick=()=>{
-  if(searchInput.value.length<3) return;
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchInput.value}&limit=1`)
-    .then(r=>r.json())
-    .then(d=>{ if(d.length) selectPlace(d[0]); });
+    sug.style.display="block";
+  });
 };
 
-/* الملاحة */
-let start=null,end=null,routing=null,mode="car";
-
-function selectPlace(p){
-  sugBox.style.display="none";
+function select(p){
+  sug.style.display="none";
   map.setView([p.lat,p.lon],15);
-  if(!start){ start=L.latLng(p.lat,p.lon); }
-  else{ end=L.latLng(p.lat,p.lon); drawRoute(); }
+  if(!start) start=L.latLng(p.lat,p.lon);
+  else{end=L.latLng(p.lat,p.lon);draw();}
 }
 
-function setMode(m){
-  mode=m;
-  if(start && end) drawRoute();
-}
-
-function drawRoute(){
-  if(routing) map.removeControl(routing);
-  routing=L.Routing.control({
+/* ملاحة */
+function setMode(m){mode=m;if(start&&end)draw();}
+function draw(){
+  if(route) map.removeControl(route);
+  route=L.Routing.control({
     waypoints:[start,end],
     router:L.Routing.osrmv1({profile:mode}),
-    addWaypoints:false,
-    draggableWaypoints:false
+    addWaypoints:false
   }).addTo(map);
 }
+function clearRoute(){if(route)map.removeControl(route);route=null;start=null;end=null}
 
-function clearRoute(){
-  if(routing) map.removeControl(routing);
-  routing=null; start=null; end=null;
+/* حفظ */
+function savePlace(){
+  if(start) localStorage.setItem("saved",JSON.stringify(start));
+  alert("تم الحفظ ⭐");
+}
+function setHome(){
+  if(start) localStorage.setItem("home",JSON.stringify(start));
+  alert("تم حفظ البيت 🏠");
+}
+function goHome(){
+  const h=localStorage.getItem("home");
+  if(h){
+    const l=JSON.parse(h);
+    map.setView([l.lat,l.lng],16);
+  }
 }
 
-/* Compass */
-let compassOn=false;
-function toggleCompass(){
-  compassOn=!compassOn;
+/* مشاركة */
+function share(){
+  if(!start)return;
+  const url=`${location.origin}${location.pathname}?lat=${start.lat}&lng=${start.lng}`;
+  navigator.clipboard.writeText(url);
+  alert("تم نسخ الرابط 📤");
 }
 
+/* سهم الاتجاه */
 if(window.DeviceOrientationEvent){
   window.addEventListener("deviceorientation",e=>{
-    if(compassOn && e.alpha){
-      map.getContainer().style.transform=`rotate(${-e.alpha}deg)`;
-    }
+    if(e.alpha)
+      document.getElementById("compass").style.transform=`rotate(${e.alpha}deg)`;
   });
 }
 </script>
