@@ -2,22 +2,23 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>Kharitati Live Navigation</title>
+<title>Kharitati Maps</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html,body{margin:0;padding:0;height:100%}
+html,body{margin:0;padding:0;height:100%;font-family:Arial}
 #map{height:100%}
 
-/* زر تحديد موقعي */
+/* زر تحديد الموقع */
 #locateBtn{
   position:fixed;
-  bottom:90px;
-  right:16px;
-  z-index:1000;
+  top:20px;
+  right:20px;
+  z-index:2000;
   background:white;
   border:none;
   border-radius:50%;
@@ -28,33 +29,57 @@ html,body{margin:0;padding:0;height:100%}
   cursor:pointer;
 }
 
-/* سهم الاتجاه */
-.arrow{
-  width:0;height:0;
-  border-left:10px solid transparent;
-  border-right:10px solid transparent;
-  border-bottom:22px solid #1976d2;
-  transform-origin:center;
+/* Bottom bar */
+#bottom{
+  position:fixed;
+  bottom:0;left:0;width:100%;
+  background:white;
+  border-radius:22px 22px 0 0;
+  box-shadow:0 -4px 20px rgba(0,0,0,.3);
+  padding:10px;
+  z-index:1500;
 }
+#info{text-align:center;font-size:14px;margin-bottom:6px}
+.row{display:flex;justify-content:space-around}
+button{background:none;border:none;font-size:22px;cursor:pointer}
+.active{color:#1976d2;font-weight:bold}
 
-/* عرض */
-.offer{
+/* Offer */
+.offer-badge{
   background:white;
   padding:4px 6px;
   border-radius:10px;
   box-shadow:0 2px 6px rgba(0,0,0,.3);
   font-size:12px;
-  white-space:nowrap;
 }
 </style>
 </head>
-<!-- Firebase SDK -->
+
+<body>
+
+<button id="locateBtn" onclick="enableGPS()">📍</button>
+
+<div id="map"></div>
+
+<div id="bottom">
+  <div id="info">اضغط 📍 لتحديد موقعك</div>
+  <div class="row">
+    <button id="walkBtn" onclick="setMode('foot')">🚶‍♂️</button>
+    <button id="carBtn" onclick="setMode('car')">🚗</button>
+    <button onclick="toggleFollow()">🧭</button>
+    <button onclick="startNav()">▶️</button>
+    <button onclick="cancelNav()">❌</button>
+    <button onclick="addOffer()">➕</button>
+  </div>
+</div>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ========= Firebase Init ========= */
+/* ================= FIREBASE ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
@@ -65,143 +90,116 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
+firebase.auth().signInAnonymously();
+const db = firebase.firestore();
 
-/* ========= Services ========= */
-const auth = firebase.auth();
-const db   = firebase.firestore();
-
-/* ========= دخول مباشر (Anonymous) ========= */
-auth.signInAnonymously()
-  .then(user=>{
-    console.log("✅ تم تسجيل الدخول", user.user.uid);
-    alert("تم الدخول بنجاح ✅");
-  })
-  .catch(err=>{
-    console.error("❌ خطأ دخول", err);
-    alert("فشل تسجيل الدخول");
-  });
-
-/* ========= اختبار Firestore مباشر ========= */
-function firestoreTest(){
-  db.collection("offers").add({
-    title: "🔥 Firestore شغال",
-    side: "front",
-    lat: 41.05,
-    lng: 28.98,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  })
-  .then(()=>{
-    alert("✅ Firestore متصل 100%");
-  })
-  .catch(e=>{
-    console.error(e);
-    alert("❌ Firestore مو متصل");
-  });
-}
-</script>
-
-  <button onclick="firestoreTest()">اختبار Firestore</button>
-
-<body>
-
-<div id="map"></div>
-<button id="locateBtn" onclick="centerOnMe()">📍</button>
-
-<script>
 /* ================= MAP ================= */
-const map = L.map("map").setView([41.05,28.98],15);
+const map = L.map("map").setView([41.05,28.98],14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 
 /* ================= STATE ================= */
-let userMarker=null;
+let start=null,end=null;
+let startMarker=null,endMarker=null,routeLine=null;
 let follow=true;
-let lastHeading=0;
-let destination=null;
-let routeLine=null;
+let mode="foot";
 
-/* ================= ICON ================= */
-const arrowIcon=L.divIcon({
-  className:"",
-  html:`<div class="arrow"></div>`,
-  iconSize:[22,22],
-  iconAnchor:[11,11]
-});
+/* ================= GPS ================= */
+function enableGPS(){
+  if(!navigator.geolocation){
+    alert("المتصفح لا يدعم GPS");
+    return;
+  }
 
-/* ================= STOP FOLLOW ================= */
+  navigator.geolocation.watchPosition(
+    p=>{
+      start=[p.coords.latitude,p.coords.longitude];
+
+      if(!startMarker){
+        startMarker=L.marker(start).addTo(map).bindPopup("موقعي");
+      }else{
+        startMarker.setLatLng(start);
+      }
+
+      if(follow) map.setView(start,17);
+      info.innerText="📍 تم تحديد موقعك";
+    },
+    err=>{
+      alert("❌ لازم تسمح بالموقع من المتصفح");
+      console.error(err);
+    },
+    {enableHighAccuracy:true}
+  );
+}
+
+/* ================= FOLLOW ================= */
+function toggleFollow(){
+  follow=!follow;
+  info.innerText=follow?"🧭 تتبع مفعّل":"🧭 التتبع متوقف";
+}
 map.on("dragstart",()=>follow=false);
 map.on("zoomstart",()=>follow=false);
 
-/* ================= GPS ================= */
-navigator.geolocation.watchPosition(
- pos=>{
-  const lat=pos.coords.latitude;
-  const lng=pos.coords.longitude;
-  const heading=pos.coords.heading ?? lastHeading;
-  lastHeading=heading;
-
-  if(!userMarker){
-    userMarker=L.marker([lat,lng],{icon:arrowIcon}).addTo(map);
-    map.setView([lat,lng],17);
-  }else{
-    userMarker.setLatLng([lat,lng]);
-  }
-
-  // تدوير السهم
-  const el=userMarker.getElement();
-  if(el) el.style.transform=`rotate(${heading}deg)`;
-
-  // Follow
-  if(follow) map.setView([lat,lng],map.getZoom(),{animate:true});
-
-  // تحديث المسار تلقائيًا
-  if(destination) updateRoute([lat,lng],destination);
- },
- err=>alert("❌ لازم تسمح بالموقع"),
- {enableHighAccuracy:true}
-);
-
-/* ================= CENTER ================= */
-function centerOnMe(){
- follow=true;
- if(userMarker) map.setView(userMarker.getLatLng(),17);
+/* ================= MODE ================= */
+function setMode(m){
+  mode=m;
+  walkBtn.classList.remove("active");
+  carBtn.classList.remove("active");
+  if(m==="foot") walkBtn.classList.add("active");
+  if(m==="car") carBtn.classList.add("active");
 }
 
-/* ================= DESTINATION ================= */
+/* ================= DEST ================= */
 map.on("click",e=>{
- destination=[e.latlng.lat,e.latlng.lng];
- updateRoute(userMarker.getLatLng(),destination);
+  end=[e.latlng.lat,e.latlng.lng];
+  if(endMarker) map.removeLayer(endMarker);
+  endMarker=L.marker(end).addTo(map).bindPopup("الوجهة");
+  info.innerText="📍 تم اختيار الوجهة";
 });
 
-/* ================= LIVE ROUTING ================= */
-function updateRoute(start,end){
- const url=`https://router.project-osrm.org/route/v1/foot/${start.lng},${start.lat};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+/* ================= ROUTE ================= */
+function startNav(){
+  if(!start||!end){alert("حدد موقعك والوجهة");return;}
 
- fetch(url).then(r=>r.json()).then(d=>{
-  if(d.code!=="Ok") return;
+  const profile=mode==="car"?"driving":"foot";
+  const url=`https://router.project-osrm.org/route/v1/${profile}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+
+  fetch(url).then(r=>r.json()).then(d=>{
+    if(d.code!=="Ok"){alert("لا يوجد مسار");return;}
+    if(routeLine) map.removeLayer(routeLine);
+    routeLine=L.geoJSON(d.routes[0].geometry,{style:{color:"#1976d2",weight:6}}).addTo(map);
+    info.innerText="▶️ الملاحة بدأت";
+  });
+}
+
+function cancelNav(){
   if(routeLine) map.removeLayer(routeLine);
-  routeLine=L.geoJSON(d.routes[0].geometry,{
-    style:{color:"#1976d2",weight:6}
-  }).addTo(map);
- });
+  if(endMarker) map.removeLayer(endMarker);
+  routeLine=null;end=null;
+  info.innerText="❌ تم الإلغاء";
 }
 
-/* ================= OFFERS (يمين / يسار) ================= */
-const offers=[
- {lat:41.051,lng:28.981,title:"بيع دكان",side:"right"},
- {lat:41.049,lng:28.979,title:"تأجير محل",side:"left"},
- {lat:41.052,lng:28.978,title:"بائع خضار",side:"front"}
-];
+/* ================= OFFERS ================= */
+function addOffer(){
+  if(!start){alert("شغّل GPS أولاً");return;}
 
-function offerIcon(o){
- const arrow=o.side==="right"?"➡️":o.side==="left"?"⬅️":"⬆️";
- return L.divIcon({
-  className:"",
-  html:`<div class="offer">${arrow} ${o.title}</div>`
- });
+  const title=prompt("اكتب وصف العرض:");
+  if(!title) return;
+
+  db.collection("offers").add({
+    title,
+    lat:start[0],
+    lng:start[1],
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
 }
 
-offers.forEach(o=>{
- L.marker([o.lat,o.lng],{icon:offerIcon(o)}).addTo(map);
+db.collection("offers").onSnapshot(snap=>{
+  snap.docChanges().forEach(c=>{
+    if(c.type==="added"){
+      const o=c.doc.data();
+      L.marker([o.lat,o.lng]).addTo(map).bindPopup("📢 "+o.title);
+    }
+  });
 });
 </script>
 
