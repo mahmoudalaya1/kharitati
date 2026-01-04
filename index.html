@@ -19,9 +19,10 @@ html,body{
 #map{
   position:fixed;
   inset:0;
+  z-index:1;
 }
 
-/* Search */
+/* شريط البحث */
 #searchBar{
   position:fixed;
   top:12px;
@@ -33,16 +34,16 @@ html,body{
   padding:12px 16px;
   border-radius:30px;
   box-shadow:0 4px 12px rgba(0,0,0,.3);
-  z-index:1000
+  z-index:1000;
 }
 #searchBar input{
   width:100%;
   border:none;
   outline:none;
-  font-size:16px
+  font-size:16px;
 }
 
-/* Bottom bar */
+/* الشريط السفلي */
 #bottom{
   position:fixed;
   bottom:0;
@@ -52,22 +53,22 @@ html,body{
   border-radius:22px 22px 0 0;
   box-shadow:0 -4px 20px rgba(0,0,0,.3);
   padding:10px;
-  z-index:1000
+  z-index:1000;
 }
 #info{
   text-align:center;
   font-size:14px;
-  margin-bottom:6px
+  margin-bottom:6px;
 }
 #bottom .row{
   display:flex;
-  justify-content:space-around
+  justify-content:space-around;
 }
 #bottom button{
   background:none;
   border:none;
   font-size:22px;
-  cursor:pointer
+  cursor:pointer;
 }
 .active{
   color:#1976d2;
@@ -88,17 +89,17 @@ html,body{
   <div id="info">اختر وضع التنقل ثم اضغط ▶️</div>
   <div class="row">
     <button id="carBtn" onclick="setMode('car')">🚗</button>
-    <button id="walkBtn" onclick="setMode('pedestrian')">🚶‍♂️</button>
+    <button id="walkBtn" onclick="setMode('walk')">🚶‍♂️</button>
     <button id="bikeBtn" onclick="setMode('bicycle')">🚴</button>
     <button onclick="startNav()">▶️</button>
   </div>
 </div>
 
 <script>
-/* ===== HERE KEY ===== */
+/* ===== HERE API KEY ===== */
 const HERE_API_KEY = "PUT_YOUR_API_KEY_HERE";
 
-/* ===== MAP ===== */
+/* ===== MAP (OSM BASE) ===== */
 const map = L.map("map").setView([41.05, 28.98], 14);
 
 L.tileLayer(
@@ -107,78 +108,90 @@ L.tileLayer(
 ).addTo(map);
 
 /* ===== STATE ===== */
-let start=null;
-let end=null;
-let startMarker=null;
-let endMarker=null;
-let routeLine=null;
-let mode="pedestrian"; // الافتراضي مشي
+let start = null;
+let end = null;
+let startMarker = null;
+let endMarker = null;
+let routeLine = null;
+let mode = "walk"; // الافتراضي مشي
 
-setMode("pedestrian");
+setMode("walk");
 
 /* ===== GPS ===== */
 navigator.geolocation.getCurrentPosition(
   p=>{
-    start=[p.coords.latitude,p.coords.longitude];
-    startMarker=L.marker(start).addTo(map);
-    map.setView(start,16);
+    start = [p.coords.latitude, p.coords.longitude];
+    startMarker = L.marker(start).addTo(map);
+    map.setView(start, 16);
   },
   ()=>alert("لم يتم السماح بتحديد الموقع"),
   {enableHighAccuracy:true}
 );
 
-/* ===== SET MODE ===== */
+/* ===== اختيار الوضع ===== */
 function setMode(m){
-  mode=m;
-  document.getElementById("carBtn").classList.remove("active");
-  document.getElementById("walkBtn").classList.remove("active");
-  document.getElementById("bikeBtn").classList.remove("active");
+  mode = m;
+
+  carBtn.classList.remove("active");
+  walkBtn.classList.remove("active");
+  bikeBtn.classList.remove("active");
 
   if(m==="car") carBtn.classList.add("active");
-  if(m==="pedestrian") walkBtn.classList.add("active");
+  if(m==="walk") walkBtn.classList.add("active");
   if(m==="bicycle") bikeBtn.classList.add("active");
 
   document.getElementById("info").innerText =
-    "تم اختيار وضع " + (m==="pedestrian"?"المشي":m==="car"?"السيارة":"الدراجة");
+    "وضع التنقل: " +
+    (m==="walk" ? "المشي" : m==="car" ? "السيارة" : "الدراجة");
 }
 
-/* ===== CLICK DEST ===== */
+/* ===== تحديد الوجهة ===== */
 map.on("click", e=>{
-  end=[e.latlng.lat,e.latlng.lng];
+  end = [e.latlng.lat, e.latlng.lng];
 
   if(endMarker) map.removeLayer(endMarker);
-  endMarker=L.marker(end).addTo(map);
+  endMarker = L.marker(end).addTo(map);
 
   document.getElementById("info").innerText =
     "تم تحديد الوجهة ✔️ اضغط ▶️ لبدء الملاحة";
 });
 
-/* ===== START NAV ===== */
+/* ===== بدء الملاحة ===== */
 function startNav(){
   if(!start || !end){
     alert("حدد وجهة أولًا");
     return;
   }
 
-  fetch(
-    `https://router.hereapi.com/v8/routes?transportMode=${mode}&origin=${start[0]},${start[1]}&destination=${end[0]},${end[1]}&return=polyline,summary&apiKey=${HERE_API_KEY}`
-  )
-  .then(r=>r.json())
-  .then(d=>{
-    if(routeLine) map.removeLayer(routeLine);
+  const url =
+    `https://router.hereapi.com/v8/routes?transportMode=${mode}` +
+    `&origin=${start[0]},${start[1]}` +
+    `&destination=${end[0]},${end[1]}` +
+    `&return=polyline,summary&apiKey=${HERE_API_KEY}`;
 
-    const s=d.routes[0].sections[0];
-    routeLine=L.polyline(decode(s.polyline),{
-      color:"#1976d2",
-      weight:6
-    }).addTo(map);
+  fetch(url)
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.routes || !d.routes.length){
+        alert("لم يتم إيجاد مسار");
+        return;
+      }
 
-    document.getElementById("info").innerText =
-      `بدأت الملاحة (${mode==="pedestrian"?"مشي":"تنقل"}) – ${(s.summary.length/1000).toFixed(1)} كم`;
-  });
+      if(routeLine) map.removeLayer(routeLine);
+
+      const s = d.routes[0].sections[0];
+      routeLine = L.polyline(decode(s.polyline),{
+        color:"#1976d2",
+        weight:6
+      }).addTo(map);
+
+      document.getElementById("info").innerText =
+        `بدأت الملاحة ${mode==="walk"?"مشياً":mode==="car"?"بالسيارة":"بالدراجة"} – ` +
+        `${(s.summary.length/1000).toFixed(1)} كم`;
+    });
 }
 
-/* ===== POLYLINE DECODE ===== */
+/* ===== فك ترميز المسار ===== */
 function decode(t){
   let p=[],i=0,lat=0,lng=0;
   while(i<t.length){
