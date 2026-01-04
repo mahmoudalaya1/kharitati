@@ -3,185 +3,121 @@
 <head>
 <meta charset="UTF-8">
 <title>خريطتي</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Leaflet Geocoder (بحث) -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+/>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  height:100%;
-  font-family:Arial;
+body, html {
+  margin: 0;
+  height: 100%;
+  font-family: Arial;
 }
 
-#loginBox{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#111;
-  z-index:10;
+#map {
+  height: 100vh;
+  width: 100%;
 }
 
-.box{
-  background:#fff;
-  padding:20px;
-  width:300px;
-  border-radius:10px;
-  text-align:center;
+#controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  z-index: 999;
+  width: 220px;
 }
 
-input,button{
-  width:100%;
-  padding:10px;
-  margin:6px 0;
+button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: none;
+  background: #1976d2;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
 }
-
-button{
-  background:#1976d2;
-  color:#fff;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-
-button.gray{background:#555}
-
-#map{
-  height:100%;
-  width:100%;
-}
-
-#controls{
-  position:absolute;
-  top:10px;
-  left:10px;
-  background:#fff;
-  padding:10px;
-  border-radius:10px;
-  z-index:5;
-  width:260px;
-}
-
-#controls button{margin-top:5px}
 </style>
 </head>
 
 <body>
 
-<!-- تسجيل الدخول -->
-<div id="loginBox">
-  <div class="box">
-    <h3>تسجيل الدخول</h3>
-    <input id="email" placeholder="البريد الإلكتروني">
-    <input id="password" type="password" placeholder="كلمة المرور">
-    <button onclick="login()">دخول</button>
-    <button onclick="register()">إنشاء حساب</button>
-    <button class="gray" onclick="resetPassword()">نسيت كلمة المرور؟</button>
-    <div id="msg" style="color:red"></div>
-  </div>
-</div>
-
-<!-- التحكم -->
-<div id="controls" style="display:none">
-  <input id="search" placeholder="ابحث عن مكان">
-  <button onclick="searchPlace()">بحث</button>
+<div id="controls">
   <button onclick="toggleTerrain()">تضاريس</button>
   <button onclick="rotateMap()">تدوير</button>
-  <button onclick="streetView()">Street View</button>
-  <button class="gray" onclick="logout()">تسجيل خروج</button>
+  <button onclick="logout()">تسجيل خروج</button>
 </div>
 
 <div id="map"></div>
 
-<!-- Firebase -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
-  authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-window.login = async()=>{
-  try{
-    await signInWithEmailAndPassword(auth,email.value,password.value);
-    showMap();
-  }catch(e){msg.innerText=e.message}
-};
-
-window.register = async()=>{
-  try{
-    await createUserWithEmailAndPassword(auth,email.value,password.value);
-    showMap();
-  }catch(e){msg.innerText=e.message}
-};
-
-window.resetPassword = async()=>{
-  await sendPasswordResetEmail(auth,email.value);
-  alert("تم إرسال الرابط");
-};
-
-window.logout = async()=>{
-  await signOut(auth);
-  location.reload();
-};
-
-function showMap(){
-  loginBox.style.display="none";
-  controls.style.display="block";
-  initMap();
-}
-</script>
-
-<!-- Google Maps -->
 <script>
-let map, terrain=false;
+/* إنشاء الخريطة */
+const map = L.map('map', {
+  zoomControl: true
+}).setView([36.2021, 37.1343], 13); // حلب
 
-function initMap(){
-  map = new google.maps.Map(document.getElementById("map"),{
-    center:{lat:33.5138,lng:36.2765},
-    zoom:13,
-    mapTypeId:"roadmap",
-    tilt:45
-  });
+/* الطبقة العادية */
+const normalLayer = L.tileLayer(
+  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { attribution: '© OpenStreetMap' }
+).addTo(map);
+
+/* طبقة التضاريس */
+const terrainLayer = L.tileLayer(
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+  { attribution: '© OpenTopoMap' }
+);
+
+let terrainOn = false;
+
+/* بحث */
+L.Control.geocoder({
+  defaultMarkGeocode: true
+}).addTo(map);
+
+/* تبديل التضاريس */
+function toggleTerrain() {
+  if (!terrainOn) {
+    map.removeLayer(normalLayer);
+    map.addLayer(terrainLayer);
+  } else {
+    map.removeLayer(terrainLayer);
+    map.addLayer(normalLayer);
+  }
+  terrainOn = !terrainOn;
 }
 
-function searchPlace(){
-  new google.maps.Geocoder().geocode(
-    {address:search.value},
-    (res,stat)=>{
-      if(stat==="OK"){
-        map.setCenter(res[0].geometry.location);
-        new google.maps.Marker({map,position:res[0].geometry.location});
-      }
-    }
-  );
+/* تدوير (محاكاة) */
+let angle = 0;
+function rotateMap() {
+  angle += 15;
+  document.getElementById("map").style.transform =
+    `rotate(${angle}deg)`;
 }
 
-function toggleTerrain(){
-  terrain=!terrain;
-  map.setMapTypeId(terrain?"terrain":"roadmap");
-}
-
-function rotateMap(){
-  map.setHeading((map.getHeading()||0)+45);
-}
-
-function streetView(){
-  map.setStreetView(new google.maps.StreetViewPanorama(
-    document.getElementById("map"),
-    {position:map.getCenter(),pov:{heading:0,pitch:0}}
-  ));
+/* تسجيل خروج */
+function logout() {
+  alert("تم تسجيل الخروج");
+  location.reload();
 }
 </script>
-
-<script src="https://maps.googleapis.com/maps/api/js?key=ضع_مفتاحك_هنا"></script>
 
 </body>
 </html>
