@@ -47,18 +47,18 @@ const db = firebase.firestore();
 <body>
 
 <!-- LOGIN -->
-<div class="login" id="login">
+<div class="login" id="loginBox">
   <div class="box">
     <h3>تسجيل</h3>
     <input id="email" placeholder="email"><br><br>
     <input id="pass" type="password" placeholder="password"><br><br>
     <input id="username" placeholder="اسم المستخدم"><br><br>
-    <button onclick="login()">دخول / تسجيل</button>
+    <button onclick="doLogin()">دخول / تسجيل</button>
   </div>
 </div>
 
 <!-- CHAT -->
-<div class="chat" id="chat">
+<div class="chat" id="chatBox">
   <div class="sidebar">
     <div class="header">الأصدقاء</div>
     <div style="padding:10px">
@@ -81,9 +81,9 @@ const db = firebase.firestore();
 <script>
 let currentChat = null;
 
-// مراقبة تسجيل الدخول
-auth.onAuthStateChanged(u=>{
-  if(u){
+// AUTH STATE
+auth.onAuthStateChanged(user=>{
+  if(user){
     saveUser();
     showChat();
     loadFriends();
@@ -92,11 +92,20 @@ auth.onAuthStateChanged(u=>{
   }
 });
 
-<button onclick="doLogin()">دخول / تسجيل</button>
+// LOGIN / REGISTER
+function doLogin(){
+  if(!email.value || !pass.value || !username.value){
+    alert("املأ جميع الحقول");
+    return;
+  }
 
+  auth.signInWithEmailAndPassword(email.value, pass.value)
+  .catch(()=>{
+    return auth.createUserWithEmailAndPassword(email.value, pass.value);
+  });
 }
 
-// حفظ المستخدم
+// SAVE USER
 function saveUser(){
   db.collection("users").doc(auth.currentUser.uid).set({
     email: auth.currentUser.email,
@@ -106,20 +115,21 @@ function saveUser(){
 
 // UI
 function showLogin(){
-  login.style.display="flex";
-  chat.style.display="none";
+  loginBox.style.display="flex";
+  chatBox.style.display="none";
 }
 function showChat(){
-  login.style.display="none";
-  chat.style.display="flex";
+  loginBox.style.display="none";
+  chatBox.style.display="flex";
 }
 
 // ADD FRIEND
 async function addFriend(){
-  let name = friendName.value;
-  if(!name) return;
+  if(!friendName.value) return;
 
-  let q = await db.collection("users").where("username","==",name).get();
+  let q = await db.collection("users")
+    .where("username","==",friendName.value).get();
+
   if(q.empty) return alert("المستخدم غير موجود");
 
   let friendId = q.docs[0].id;
@@ -127,7 +137,7 @@ async function addFriend(){
   let chatId = [myId, friendId].sort().join("_");
 
   await db.collection("friends").doc(chatId).set({
-    users:[myId,friendId]
+    users:[myId, friendId]
   });
 
   friendName.value="";
@@ -137,14 +147,13 @@ async function addFriend(){
 function loadFriends(){
   db.collection("friends")
   .where("users","array-contains",auth.currentUser.uid)
-  .onSnapshot(async s=>{
+  .onSnapshot(async snap=>{
     friends.innerHTML="";
-    for(let d of s.docs){
-      let ids = d.data().users;
-      let friendId = ids.find(i=>i!==auth.currentUser.uid);
-      let u = await db.collection("users").doc(friendId).get();
-      let div = document.createElement("div");
-      div.innerText = u.data().username;
+    for(const d of snap.docs){
+      let fid = d.data().users.find(u=>u!==auth.currentUser.uid);
+      let u = await db.collection("users").doc(fid).get();
+      let div=document.createElement("div");
+      div.innerText=u.data().username;
       div.onclick=()=>openChat(d.id,u.data().username);
       friends.appendChild(div);
     }
@@ -159,13 +168,13 @@ function openChat(id,name){
 }
 
 function send(){
-  if(!text.value||!currentChat) return;
+  if(!text.value || !currentChat) return;
   db.collection("chats").doc(currentChat)
-  .collection("messages").add({
-    text:text.value,
-    user:auth.currentUser.uid,
-    time:Date.now()
-  });
+    .collection("messages").add({
+      text:text.value,
+      user:auth.currentUser.uid,
+      time:Date.now()
+    });
   text.value="";
 }
 
