@@ -10,170 +10,145 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html,body{margin:0;height:100%;font-family:Arial}
+html,body{
+  margin:0;
+  height:100%;
+  font-family:Arial, sans-serif;
+}
 #map{height:100%}
 
-/* شريط علوي */
-#topBar{
-  position:fixed;top:0;left:0;right:0;height:56px;
-  background:#fff;display:flex;align-items:center;
-  gap:8px;padding:0 10px;box-shadow:0 2px 8px rgba(0,0,0,.15);
-  z-index:1200
+/* ===== الشريط العلوي ===== */
+#appBar{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:56px;
+  background:#2f3f9e;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  gap:10px;
+  z-index:1200;
 }
-#title{font-weight:bold;font-size:18px}
-#search{
-  flex:1;border:1px solid #ddd;border-radius:10px;
-  padding:8px 10px;font-size:14px
+#menuBtn{
+  width:36px;height:36px;
+  border-radius:50%;
+  background:#34c759;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
 }
-#searchBtn{
-  border:none;border-radius:10px;padding:8px 12px;
-  background:#2d7cff;color:#fff;cursor:pointer
+#title{
+  flex:1;
+  font-weight:bold;
+  font-size:16px;
+}
+#more{
+  font-size:22px;
 }
 
-/* أزرار Floating */
+/* ===== أزرار الخريطة ===== */
 .map-btn{
-  position:fixed;right:16px;width:48px;height:48px;
-  border-radius:14px;background:#fff;border:none;
-  font-size:20px;box-shadow:0 8px 20px rgba(0,0,0,.25);
-  cursor:pointer;z-index:1100
+  position:fixed;
+  right:12px;
+  width:44px;height:44px;
+  background:#fff;
+  border:none;
+  border-radius:6px;
+  font-size:22px;
+  box-shadow:0 4px 10px rgba(0,0,0,.25);
+  cursor:pointer;
+  z-index:1100;
 }
-#locate{top:70px}
-#zoomIn{top:130px}
-#zoomOut{top:190px}
-#theme{top:250px}
-
-#navBtn{
-  bottom:24px;right:50%;transform:translateX(50%);
-  width:64px;height:64px;border-radius:50%;
-  background:#2d7cff;color:#fff;font-size:26px
+#zoomIn{top:80px}
+#zoomOut{top:126px}
+#locate{
+  top:180px;
+  color:#2d7cff;
 }
 
-/* سهم الاتجاه */
-#compass{
-  position:fixed;left:16px;bottom:24px;
-  width:52px;height:52px;border-radius:50%;
-  background:#fff;display:flex;align-items:center;
-  justify-content:center;font-size:22px;
-  box-shadow:0 8px 20px rgba(0,0,0,.25);
-  z-index:1100
+/* ===== شريط التكبير السفلي ===== */
+#bottomZoom{
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  background:#e0e0e0;
+  border-radius:8px;
+  overflow:hidden;
+  z-index:1100;
 }
-#arrow{transition:transform .2s linear}
+#bottomZoom button{
+  width:44px;height:36px;
+  border:none;
+  font-size:20px;
+  background:#d6d6d6;
+}
 
-/* وضع ليلي */
-.dark #topBar{background:#1e1e1e;color:#fff}
-.dark #search{background:#2b2b2b;color:#fff;border-color:#444}
-.dark .map-btn{background:#1e1e1e;color:#fff}
+/* ===== مؤشر الموقع ===== */
+.user-dot{
+  width:16px;height:16px;
+  background:#2d7cff;
+  border:3px solid #fff;
+  border-radius:50%;
+  box-shadow:0 0 0 6px rgba(45,124,255,.25);
+}
 </style>
 </head>
 
 <body>
 
 <!-- الشريط العلوي -->
-<div id="topBar">
-  <div id="title">🗺️ خريطتي</div>
-  <input id="search" placeholder="ابحث عن مكان...">
-  <button id="searchBtn">🔍</button>
+<div id="appBar">
+  <div id="menuBtn">📍</div>
+  <div id="title">MAHMOUD ALAYA</div>
+  <div id="more">⋮</div>
 </div>
 
-<!-- الأزرار -->
-<button id="locate" class="map-btn">📍</button>
+<!-- أزرار -->
 <button id="zoomIn" class="map-btn">＋</button>
 <button id="zoomOut" class="map-btn">－</button>
-<button id="theme" class="map-btn">🌙</button>
-<button id="navBtn" class="map-btn">🧭</button>
+<button id="locate" class="map-btn">⌖</button>
 
-<div id="compass"><div id="arrow">▲</div></div>
+<div id="bottomZoom">
+  <button onclick="map.zoomOut()">−</button>
+  <button onclick="map.zoomIn()">＋</button>
+</div>
+
 <div id="map"></div>
 
 <script>
-// ================== الخريطة ==================
-var map = L.map('map',{zoomControl:false}).setView([36.2021,37.1343],13);
+// ===== إنشاء الخريطة =====
+var map = L.map('map',{
+  zoomControl:false
+}).setView([41.0476,28.9465],14);
 
-// Tiles
-var lightTiles = L.tileLayer(
+// ستايل فاتح مثل Mapbox Streets
+L.tileLayer(
   'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {maxZoom:19,attribution:''}
 ).addTo(map);
 
-var darkTiles = L.tileLayer(
-  'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
-  {maxZoom:19,attribution:''}
-);
-
-var dark=false;
-
-// ================== أزرار ==================
+// أزرار
 zoomIn.onclick=()=>map.zoomIn();
 zoomOut.onclick=()=>map.zoomOut();
 
+// تحديد الموقع
+var userMarker;
 locate.onclick=()=>{
   map.locate({setView:true,maxZoom:16});
 };
 
-// ================== مؤشر الموقع ==================
-var userMarker;
 map.on('locationfound',e=>{
   if(userMarker) map.removeLayer(userMarker);
-  userMarker=L.circleMarker(e.latlng,{
-    radius:8,color:'#2d7cff',
-    fillColor:'#2d7cff',fillOpacity:1
-  }).addTo(map).bindPopup("موقعك الحالي");
-});
-
-// ================== البحث ==================
-searchBtn.onclick=()=>{
-  var q=search.value.trim();
-  if(!q) return;
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
-    .then(r=>r.json())
-    .then(d=>{
-      if(!d[0]) return alert("لم يتم العثور على المكان");
-      var lat=d[0].lat, lon=d[0].lon;
-      map.setView([lat,lon],15);
-      L.marker([lat,lon]).addTo(map)
-        .bindPopup(d[0].display_name).openPopup();
-    });
-};
-
-// ================== الملاحة ==================
-var routeLine=null;
-navBtn.onclick=()=>{
-  if(routeLine){map.removeLayer(routeLine);routeLine=null;return;}
-  var route=[
-    [36.2021,37.1343],
-    [36.2055,37.1380],
-    [36.2090,37.1425],
-    [36.2130,37.1470]
-  ];
-  routeLine=L.polyline(route,{
-    color:'#2d7cff',weight:6,lineCap:'round'
+  userMarker = L.marker(e.latlng,{
+    icon:L.divIcon({
+      className:'',
+      html:'<div class="user-dot"></div>',
+      iconSize:[16,16]
+    })
   }).addTo(map);
-  map.fitBounds(routeLine.getBounds(),{padding:[50,50]});
-};
-
-// ================== الوضع الليلي ==================
-theme.onclick=()=>{
-  dark=!dark;
-  document.body.classList.toggle('dark',dark);
-  if(dark){
-    map.removeLayer(lightTiles);
-    darkTiles.addTo(map);
-    theme.textContent='☀️';
-  }else{
-    map.removeLayer(darkTiles);
-    lightTiles.addTo(map);
-    theme.textContent='🌙';
-  }
-};
-
-// ================== البوصلة ==================
-if(window.DeviceOrientationEvent){
-  window.addEventListener('deviceorientation',e=>{
-    if(e.alpha==null) return;
-    document.getElementById('arrow')
-      .style.transform=`rotate(${-e.alpha}deg)`;
-  });
-}
+});
 </script>
 
 </body>
