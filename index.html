@@ -14,14 +14,15 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
 .messages{flex:1;display:flex;flex-direction:column}
 .header{background:#075e54;color:#fff;padding:10px;text-align:center}
-.list div{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+.list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
 .list div:hover{background:#f0f0f0}
 .msgs{flex:1;padding:10px;overflow:auto}
 .msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
+.me{background:#b2f2bb;margin-left:auto}
 .input{display:flex}
 input{flex:1;padding:10px}
 button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
-.req button{margin:3px}
+.small{font-size:11px;color:#555}
 </style>
 
 <!-- Firebase -->
@@ -41,11 +42,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const db   = firebase.firestore();
-
-function generateUserCode(uid){
-  return uid.slice(0,6).toUpperCase();
-}
+const db = firebase.firestore();
 </script>
 </head>
 
@@ -65,145 +62,145 @@ function generateUserCode(uid){
 <!-- CHAT -->
 <div class="chat" id="chatBox">
 
-<div class="sidebar">
+  <div class="sidebar">
+    <div class="header">كل المستخدمين</div>
+    <div class="list" id="allUsers"></div>
 
-  <div class="header">كودك</div>
-  <div class="list" id="myCode"></div>
+    <div class="header">طلبات الصداقة</div>
+    <div class="list" id="requests"></div>
 
-  <div class="header">إضافة صديق بالكود</div>
-  <input id="friendCode" placeholder="مثال: A1B2C3">
-  <button onclick="sendFriendRequest()">إرسال طلب</button>
-
-  <div class="header">طلبات الصداقة</div>
-  <div class="list" id="requests"></div>
-
-  <div class="header">أصدقائي</div>
-  <div class="list" id="friends"></div>
-
-</div>
-
-<div class="messages">
-  <div class="header" id="chatHeader">اختر صديق</div>
-  <div class="msgs" id="msgs"></div>
-  <div class="input">
-    <input id="text" placeholder="اكتب رسالة">
-    <button onclick="send()">➤</button>
+    <div class="header">أصدقائي</div>
+    <div class="list" id="friends"></div>
   </div>
-</div>
 
+  <div class="messages">
+    <div class="header" id="chatHeader">اختر صديق</div>
+    <div class="msgs" id="msgs"></div>
+    <div class="input">
+      <input id="text" placeholder="اكتب رسالة">
+      <button onclick="send()">➤</button>
+    </div>
+  </div>
 </div>
 
 <script>
 let currentChat=null;
 
+// AUTH
 auth.onAuthStateChanged(user=>{
   if(user){
-    saveUser();
+    db.collection("users").doc(user.uid).set({
+      email:user.email,
+      username: username.value || "مستخدم",
+      online:true
+    },{merge:true});
+
     showChat();
-    loadMyCode();
-    loadFriends();
+    loadUsers();
     loadRequests();
-  }else{
-    showLogin();
+    loadFriends();
+  }else showLogin();
+});
+
+window.addEventListener("beforeunload",()=>{
+  if(auth.currentUser){
+    db.collection("users").doc(auth.currentUser.uid)
+    .update({online:false});
   }
 });
 
 function doLogin(){
   if(!email.value||!pass.value) return alert("املأ البيانات");
   auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(()=>{
-    if(!username.value) return alert("اسم المستخدم مطلوب");
-    return auth.createUserWithEmailAndPassword(email.value,pass.value);
+  .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
+}
+
+function showLogin(){
+  loginBox.style.display="flex";
+  chatBox.style.display="none";
+}
+function showChat(){
+  loginBox.style.display="none";
+  chatBox.style.display="flex";
+}
+
+// USERS
+function loadUsers(){
+  db.collection("users").onSnapshot(s=>{
+    allUsers.innerHTML="";
+    s.forEach(d=>{
+      if(d.id===auth.currentUser.uid) return;
+      const div=document.createElement("div");
+      div.innerHTML=`➕ ${d.data().username}`;
+      div.onclick=()=>sendRequest(d.id);
+      allUsers.appendChild(div);
+    });
   });
 }
 
-function saveUser(){
-  if(!username.value) return;
-  const uid=auth.currentUser.uid;
-  db.collection("users").doc(uid).set({
-    username:username.value,
-    email:auth.currentUser.email,
-    code:generateUserCode(uid)
-  },{merge:true});
-}
-
-function showLogin(){loginBox.style.display="flex";chatBox.style.display="none";}
-function showChat(){loginBox.style.display="none";chatBox.style.display="flex";}
-
-function loadMyCode(){
-  db.collection("users").doc(auth.currentUser.uid).get()
-  .then(d=>{
-    myCode.innerText="🔑 "+d.data().code;
+// FRIEND REQUEST
+function sendRequest(to){
+  db.collection("requests").add({
+    from:auth.currentUser.uid,
+    to
   });
 }
 
-/* ====== طلبات الصداقة ====== */
-async function sendFriendRequest(){
-  const code=friendCode.value.trim().toUpperCase();
-  if(!code) return;
-
-  const q=await db.collection("users").where("code","==",code).get();
-  if(q.empty) return alert("لا يوجد مستخدم");
-
-  const toId=q.docs[0].id;
-  const fromId=auth.currentUser.uid;
-  if(toId===fromId) return;
-
-  await db.collection("friend_requests").add({
-    from:fromId,to:toId,status:"pending",time:Date.now()
-  });
-
-  alert("تم إرسال الطلب");
-  friendCode.value="";
-}
-
+// LOAD REQUESTS
 function loadRequests(){
-  db.collection("friend_requests")
+  db.collection("requests")
   .where("to","==",auth.currentUser.uid)
-  .where("status","==","pending")
-  .onSnapshot(async snap=>{
+  .onSnapshot(s=>{
     requests.innerHTML="";
-    for(const d of snap.docs){
+    s.forEach(async d=>{
       const u=await db.collection("users").doc(d.data().from).get();
       const div=document.createElement("div");
-      div.className="req";
       div.innerHTML=`
-        ${u.data().username}
-        <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
-        <button onclick="reject('${d.id}')">✖</button>`;
+      ${u.data().username}
+      <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
+      <button onclick="reject('${d.id}')">✖</button>`;
       requests.appendChild(div);
-    }
+    });
   });
 }
 
 function accept(reqId,friendId){
-  const myId=auth.currentUser.uid;
-  const chatId=[myId,friendId].sort().join("_");
-  db.collection("friends").doc(chatId).set({users:[myId,friendId]});
-  db.collection("friend_requests").doc(reqId).update({status:"accepted"});
+  const chatId=[auth.currentUser.uid,friendId].sort().join("_");
+  db.collection("friends").doc(chatId).set({
+    users:[auth.currentUser.uid,friendId]
+  });
+  db.collection("requests").doc(reqId).delete();
 }
 
-function reject(reqId){
-  db.collection("friend_requests").doc(reqId).update({status:"rejected"});
+function reject(id){
+  db.collection("requests").doc(id).delete();
 }
 
-/* ====== الأصدقاء والدردشة ====== */
+// FRIENDS
 function loadFriends(){
   db.collection("friends")
   .where("users","array-contains",auth.currentUser.uid)
-  .onSnapshot(async snap=>{
+  .onSnapshot(async s=>{
     friends.innerHTML="";
-    for(const d of snap.docs){
+    for(const d of s.docs){
       const fid=d.data().users.find(u=>u!==auth.currentUser.uid);
       const u=await db.collection("users").doc(fid).get();
       const div=document.createElement("div");
-      div.innerText=u.data().username;
+      div.innerHTML=`
+      ${u.data().username} ${u.data().online?"🟢":"⚪"}
+      <button onclick="removeFriend('${d.id}')">❌</button>`;
       div.onclick=()=>openChat(d.id,u.data().username);
       friends.appendChild(div);
     }
   });
 }
 
+function removeFriend(id){
+  if(confirm("حذف الصديق؟"))
+    db.collection("friends").doc(id).delete();
+}
+
+// CHAT
 function openChat(id,name){
   currentChat=id;
   chatHeader.innerText=name;
@@ -215,8 +212,9 @@ function send(){
   db.collection("chats").doc(currentChat)
   .collection("messages").add({
     text:text.value,
-    user:auth.currentUser.uid,
-    time:Date.now()
+    from:auth.currentUser.uid,
+    time:Date.now(),
+    status:"sent"
   });
   text.value="";
 }
@@ -228,8 +226,11 @@ function listen(){
     msgs.innerHTML="";
     s.forEach(d=>{
       const m=document.createElement("div");
-      m.className="msg";
-      m.innerText=d.data().text;
+      m.className="msg"+(d.data().from===auth.currentUser.uid?" me":"");
+      m.innerHTML=d.data().text+
+      `<div class="small">${d.data().status==="seen"?"✔✔":"✔"}</div>`;
+      if(d.data().from!==auth.currentUser.uid)
+        d.ref.update({status:"seen"});
       msgs.appendChild(m);
     });
   });
