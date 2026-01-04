@@ -135,17 +135,43 @@ let mode="foot";
 let follow=true;
 let follow = true;
 
-// إذا لمس المستخدم الخريطة نوقف التتبع
+/* ================= FOLLOW ================= */
+let follow = true;
+
+// إيقاف التتبع عند لمس الخريطة
 map.on("dragstart",()=>follow=false);
 map.on("zoomstart",()=>follow=false);
 
-/* ================= GPS ================= */
-navigator.geolocation.watchPosition(p=>{
-  start=[p.coords.latitude,p.coords.longitude];
-  if(!startMarker) startMarker=L.marker(start).addTo(map);
-  else startMarker.setLatLng(start);
-  if(follow) map.setView(start,17);
-});
+/* ================= GPS CONTROLLED ================= */
+let watchId = null;
+
+function enableGPS(){
+  if(watchId) return; // إذا شغال لا تعيد
+
+  watchId = navigator.geolocation.watchPosition(
+    p=>{
+      start = [p.coords.latitude, p.coords.longitude];
+
+      if(!startMarker){
+        startMarker = L.marker(start).addTo(map);
+      }else{
+        startMarker.setLatLng(start);
+      }
+
+      if(follow){
+        map.setView(start,17,{animate:true});
+      }
+
+      document.getElementById("gpsCard").style.display="none";
+      info.innerText = "تم تشغيل GPS ✔️";
+    },
+    err=>{
+      alert("لازم تسمح بالموقع من المتصفح");
+      console.error(err);
+    },
+    {enableHighAccuracy:true}
+  );
+}
 
 /* ================= MODE ================= */
 function setMode(m){
