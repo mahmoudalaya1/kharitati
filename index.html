@@ -47,6 +47,43 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
 }
 </style>
 </head>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "PUT_API_KEY_HERE",
+  authDomain: "kharitati-5cb37.firebaseapp.com",
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.appspot.com",
+  messagingSenderId: "PUT_SENDER_ID",
+  appId: "PUT_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// تسجيل دخول تلقائي
+auth.signInAnonymously();
+
+// عرض العروض على الخريطة
+db.collection("offers").onSnapshot(snapshot=>{
+  snapshot.docChanges().forEach(change=>{
+    if(change.type === "added"){
+      const o = change.doc.data();
+      if(o.lat && o.lng){
+        L.marker([o.lat, o.lng])
+          .addTo(map)
+          .bindPopup(o.title || "عرض");
+      }
+    }
+  });
+});
+</script>
 
 <body>
 
