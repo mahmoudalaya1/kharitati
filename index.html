@@ -5,149 +5,203 @@
 <title>خريطتي</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html,body{
-  margin:0;
-  height:100%;
-  font-family:Arial, sans-serif;
-}
+html,body{margin:0;height:100%;font-family:Arial}
 #map{height:100%}
 
-/* ===== الشريط العلوي ===== */
+/* AppBar */
 #appBar{
-  position:fixed;
-  top:0;left:0;right:0;
-  height:56px;
-  background:#2f3f9e;
-  color:#fff;
-  display:flex;
-  align-items:center;
-  padding:0 12px;
-  gap:10px;
-  z-index:1200;
+  position:fixed;top:0;left:0;right:0;height:56px;
+  background:#2f3f9e;color:#fff;
+  display:flex;align-items:center;
+  padding:0 12px;z-index:1200
 }
-#menuBtn{
-  width:36px;height:36px;
-  border-radius:50%;
-  background:#34c759;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:18px;
-}
-#title{
-  flex:1;
-  font-weight:bold;
-  font-size:16px;
-}
-#more{
-  font-size:22px;
-}
+#title{flex:1;font-weight:bold}
 
-/* ===== أزرار الخريطة ===== */
+/* أزرار */
 .map-btn{
-  position:fixed;
-  right:12px;
+  position:fixed;right:12px;
   width:44px;height:44px;
-  background:#fff;
-  border:none;
-  border-radius:6px;
-  font-size:22px;
-  box-shadow:0 4px 10px rgba(0,0,0,.25);
-  cursor:pointer;
-  z-index:1100;
-}
-#zoomIn{top:80px}
-#zoomOut{top:126px}
-#locate{
-  top:180px;
-  color:#2d7cff;
-}
-
-/* ===== شريط التكبير السفلي ===== */
-#bottomZoom{
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  background:#e0e0e0;
-  border-radius:8px;
-  overflow:hidden;
-  z-index:1100;
-}
-#bottomZoom button{
-  width:44px;height:36px;
-  border:none;
+  background:#fff;border:none;border-radius:8px;
   font-size:20px;
-  background:#d6d6d6;
+  box-shadow:0 4px 10px rgba(0,0,0,.25);
+  cursor:pointer;z-index:1100
+}
+#zoomIn{top:70px}
+#zoomOut{top:120px}
+#locate{top:170px;color:#1a73e8}
+#startNav{top:230px;background:#1a73e8;color:#fff}
+#share{top:290px;color:#ff9500}
+#searchBtn{top:350px;color:#7a3df0}
+
+/* بحث */
+#searchBox{
+  position:fixed;top:60px;left:50%;
+  transform:translateX(-50%);
+  width:80%;padding:10px;
+  border:none;border-radius:12px;
+  box-shadow:0 2px 10px rgba(0,0,0,.3);
+  display:none;z-index:2000
 }
 
-/* ===== مؤشر الموقع ===== */
-.user-dot{
-  width:16px;height:16px;
-  background:#2d7cff;
-  border:3px solid #fff;
-  border-radius:50%;
-  box-shadow:0 0 0 6px rgba(45,124,255,.25);
+/* سهم الاتجاه */
+.arrow{
+  width:0;height:0;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-bottom:22px solid #1a73e8;
+  transform-origin:center;
 }
 </style>
 </head>
 
 <body>
 
-<!-- الشريط العلوي -->
 <div id="appBar">
-  <div id="menuBtn">📍</div>
   <div id="title">MAHMOUD ALAYA</div>
-  <div id="more">⋮</div>
 </div>
 
-<!-- أزرار -->
+<input id="searchBox" placeholder="ابحث عن مكان واضغط Enter">
+
 <button id="zoomIn" class="map-btn">＋</button>
 <button id="zoomOut" class="map-btn">－</button>
 <button id="locate" class="map-btn">⌖</button>
-
-<div id="bottomZoom">
-  <button onclick="map.zoomOut()">−</button>
-  <button onclick="map.zoomIn()">＋</button>
-</div>
+<button id="startNav" class="map-btn">▶️</button>
+<button id="share" class="map-btn">📤</button>
+<button id="searchBtn" class="map-btn">🔍</button>
 
 <div id="map"></div>
 
 <script>
-// ===== إنشاء الخريطة =====
-var map = L.map('map',{
-  zoomControl:false
-}).setView([41.0476,28.9465],14);
+/* ===== الخريطة ===== */
+const map = L.map("map",{zoomControl:false})
+  .setView([41.05,28.98],14);
 
-// ستايل فاتح مثل Mapbox Streets
 L.tileLayer(
-  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {maxZoom:19,attribution:''}
+  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  {maxZoom:19}
 ).addTo(map);
 
-// أزرار
+/* ===== متغيرات ===== */
+let userLatLng=null;
+let arrowMarker=null;
+let destination=null;
+let routeLine=null;
+let navigating=false;
+let compassAngle=0;
+
+/* ===== أزرار ===== */
 zoomIn.onclick=()=>map.zoomIn();
 zoomOut.onclick=()=>map.zoomOut();
 
-// تحديد الموقع
-var userMarker;
+/* ===== GPS حي ===== */
 locate.onclick=()=>{
-  map.locate({setView:true,maxZoom:16});
+  map.locate({
+    watch:true,
+    setView:true,
+    enableHighAccuracy:true
+  });
 };
 
-map.on('locationfound',e=>{
-  if(userMarker) map.removeLayer(userMarker);
-  userMarker = L.marker(e.latlng,{
-    icon:L.divIcon({
-      className:'',
-      html:'<div class="user-dot"></div>',
-      iconSize:[16,16]
-    })
-  }).addTo(map);
+map.on("locationfound",e=>{
+  userLatLng=e.latlng;
+
+  if(!arrowMarker){
+    arrowMarker=L.marker(userLatLng,{
+      icon:L.divIcon({
+        className:"",
+        html:'<div class="arrow"></div>',
+        iconSize:[22,22],
+        iconAnchor:[11,11]
+      })
+    }).addTo(map);
+  }else{
+    arrowMarker.setLatLng(userLatLng);
+  }
+
+  if(navigating && destination){
+    drawRoute();
+  }
+});
+
+/* ===== بوصلة حقيقية ===== */
+if(window.DeviceOrientationEvent){
+  window.addEventListener("deviceorientation",e=>{
+    if(e.alpha!==null){
+      compassAngle=360-e.alpha;
+      if(arrowMarker){
+        const el=arrowMarker.getElement();
+        if(el) el.style.transform=`rotate(${compassAngle}deg)`;
+      }
+    }
+  },true);
+}
+
+/* ===== اختيار وجهة ===== */
+map.on("click",e=>{
+  destination=e.latlng;
+  L.marker(destination).addTo(map)
+    .bindPopup("🎯 الوجهة").openPopup();
+});
+
+/* ===== رسم المسار ===== */
+function drawRoute(){
+  if(!userLatLng||!destination) return;
+
+  const url=
+   `https://router.project-osrm.org/route/v1/driving/`+
+   `${userLatLng.lng},${userLatLng.lat};`+
+   `${destination.lng},${destination.lat}`+
+   `?overview=full&geometries=geojson`;
+
+  fetch(url).then(r=>r.json()).then(d=>{
+    if(routeLine) map.removeLayer(routeLine);
+    routeLine=L.geoJSON(d.routes[0].geometry,{
+      style:{color:"#1a73e8",weight:6}
+    }).addTo(map);
+  });
+}
+
+/* ===== بدء مشوار ===== */
+startNav.onclick=()=>{
+  if(!userLatLng||!destination){
+    alert("حدد موقعك والوجهة");
+    return;
+  }
+  navigating=true;
+  drawRoute();
+};
+
+/* ===== مشاركة موقعي ===== */
+share.onclick=()=>{
+  if(!userLatLng){
+    alert("شغّل GPS أولاً");
+    return;
+  }
+  const link=`https://www.google.com/maps?q=${userLatLng.lat},${userLatLng.lng}`;
+  navigator.clipboard.writeText(link);
+  alert("تم نسخ رابط موقعك");
+};
+
+/* ===== بحث ===== */
+searchBtn.onclick=()=>{
+  searchBox.style.display=
+    searchBox.style.display==="block"?"none":"block";
+};
+
+searchBox.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchBox.value}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(!d.length) return alert("لم يتم العثور");
+        map.setView([d[0].lat,d[0].lon],16);
+        searchBox.style.display="none";
+      });
+  }
 });
 </script>
 
