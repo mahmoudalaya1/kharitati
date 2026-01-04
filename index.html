@@ -23,47 +23,25 @@ input{flex:1;padding:10px}
 button{padding:10px;background:#25d366;border:none;color:#fff}
 </style>
 
-<!-- Firebase -->
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
-// LOGIN / REGISTER (مصححة 100%)
-function doLogin(){
-  console.log("زر الدخول تم الضغط عليه");
-
-  if(!email.value || !pass.value){
-    alert("اكتب الإيميل وكلمة المرور");
-    return;
-  }
-
-  // محاولة تسجيل الدخول
-  auth.signInWithEmailAndPassword(email.value, pass.value)
-  .then(()=>{
-    console.log("تم تسجيل الدخول");
-  })
-  .catch(()=>{
-    // إذا لم يكن الحساب موجود → تسجيل جديد
-    if(!username.value){
-      alert("اكتب اسم المستخدم لإنشاء حساب جديد");
-      return;
-    }
-
-    auth.createUserWithEmailAndPassword(email.value, pass.value)
-    .then(()=>{
-      console.log("تم إنشاء الحساب");
-    })
-    .catch(e=>{
-      alert(e.message);
-      console.error(e);
-    });
-  });
-}
-</script>
+// 🔥 Firebase config (تأكد أنه من نفس Web App)
+const firebaseConfig = {
+  apiKey: "AIzaSyDr5hQl0t0eI0AYI7--xLZFYpFw8F6vXRA",
+  authDomain: "kharitati-5cb37.firebaseapp.com",
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.appspot.com",
+  messagingSenderId: "296218682746",
+  appId: "1:296218682746:web:e097a1279383dd02eea2c3"
+};
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const db = firebase.firestore();
+const db   = firebase.firestore();
 </script>
 </head>
 
@@ -75,7 +53,7 @@ const db = firebase.firestore();
     <h3>تسجيل</h3>
     <input id="email" placeholder="email"><br><br>
     <input id="pass" type="password" placeholder="password"><br><br>
-    <input id="username" placeholder="اسم المستخدم"><br><br>
+    <input id="username" placeholder="اسم المستخدم (للتسجيل فقط)"><br><br>
     <button onclick="doLogin()">دخول / تسجيل</button>
   </div>
 </div>
@@ -104,7 +82,7 @@ const db = firebase.firestore();
 <script>
 let currentChat = null;
 
-// AUTH STATE
+// مراقبة حالة تسجيل الدخول
 auth.onAuthStateChanged(user=>{
   if(user){
     saveUser();
@@ -115,28 +93,33 @@ auth.onAuthStateChanged(user=>{
   }
 });
 
-// LOGIN / REGISTER
+// دخول / تسجيل
 function doLogin(){
-  if(!email.value || !pass.value || !username.value){
-    alert("املأ جميع الحقول");
+  if(!email.value || !pass.value){
+    alert("اكتب الإيميل وكلمة المرور");
     return;
   }
 
   auth.signInWithEmailAndPassword(email.value, pass.value)
   .catch(()=>{
+    if(!username.value){
+      alert("اكتب اسم المستخدم لإنشاء حساب جديد");
+      return;
+    }
     return auth.createUserWithEmailAndPassword(email.value, pass.value);
   });
 }
 
-// SAVE USER
+// حفظ المستخدم
 function saveUser(){
+  if(!username.value) return;
   db.collection("users").doc(auth.currentUser.uid).set({
     email: auth.currentUser.email,
     username: username.value
   },{merge:true});
 }
 
-// UI
+// واجهة
 function showLogin(){
   loginBox.style.display="flex";
   chatBox.style.display="none";
@@ -146,7 +129,7 @@ function showChat(){
   chatBox.style.display="flex";
 }
 
-// ADD FRIEND
+// إضافة صديق
 async function addFriend(){
   if(!friendName.value) return;
 
@@ -166,7 +149,7 @@ async function addFriend(){
   friendName.value="";
 }
 
-// LOAD FRIENDS
+// تحميل الأصدقاء
 function loadFriends(){
   db.collection("friends")
   .where("users","array-contains",auth.currentUser.uid)
@@ -183,7 +166,7 @@ function loadFriends(){
   });
 }
 
-// CHAT
+// الدردشة
 function openChat(id,name){
   currentChat=id;
   chatHeader.innerText=name;
