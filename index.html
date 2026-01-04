@@ -228,6 +228,29 @@ function saveOffer(){
  });
  closeOffer();
 }
+function enableGPS(){
+  navigator.geolocation.getCurrentPosition(
+    p=>{
+      start = [p.coords.latitude, p.coords.longitude];
+
+      if(!startMarker){
+        startMarker = L.marker(start).addTo(map);
+      }else{
+        startMarker.setLatLng(start);
+      }
+
+      map.setView(start,17);
+      document.getElementById("gpsCard").style.display="none";
+      info.innerText = "تم تشغيل GPS ✔️";
+    },
+    err=>{
+      alert("لازم تسمح بالموقع من المتصفح");
+      console.error(err);
+    },
+    {enableHighAccuracy:true}
+  );
+}
+
 </script>
 
 </body>
