@@ -5,117 +5,141 @@
 <title>خريطتي</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet CSS -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Leaflet Geocoder (بحث) -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
-/>
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <style>
-body, html {
-  margin: 0;
-  height: 100%;
-  font-family: Arial;
+html,body{margin:0;height:100%;font-family:Arial}
+#map{height:100vh}
+
+/* زر الحساب */
+#accountBtn{
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  width:55px;
+  height:55px;
+  border-radius:50%;
+  background:#1976d2;
+  color:#fff;
+  font-size:26px;
+  border:none;
+  cursor:pointer;
+  z-index:1000;
 }
 
-#map {
-  height: 100vh;
-  width: 100%;
+/* نافذة الدخول */
+#loginBox{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.6);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:2000;
 }
 
-#controls {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: white;
-  padding: 10px;
-  border-radius: 8px;
-  z-index: 999;
-  width: 220px;
+#loginBox .box{
+  background:#fff;
+  padding:20px;
+  width:280px;
+  border-radius:10px;
+  text-align:center;
 }
 
-button {
-  width: 100%;
-  margin-top: 6px;
-  padding: 8px;
-  border: none;
-  background: #1976d2;
-  color: white;
-  border-radius: 6px;
-  cursor: pointer;
+input,button{
+  width:100%;
+  padding:10px;
+  margin-top:6px;
+}
+
+button.main{
+  background:#1976d2;
+  color:white;
+  border:none;
+  border-radius:6px;
+}
+
+button.gray{
+  background:#555;
+  color:white;
+  border:none;
+  border-radius:6px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="controls">
-  <button onclick="toggleTerrain()">تضاريس</button>
-  <button onclick="rotateMap()">تدوير</button>
-  <button onclick="logout()">تسجيل خروج</button>
+<!-- نافذة الدخول -->
+<div id="loginBox">
+  <div class="box">
+    <h3>الحساب</h3>
+    <input id="email" placeholder="البريد الإلكتروني">
+    <input id="password" type="password" placeholder="كلمة المرور">
+    <button class="main" onclick="login()">دخول</button>
+    <button class="main" onclick="register()">إنشاء حساب</button>
+    <button class="gray" onclick="logout()">تسجيل خروج</button>
+    <button onclick="closeLogin()">إغلاق</button>
+  </div>
 </div>
+
+<button id="accountBtn" onclick="openLogin()">👤</button>
 
 <div id="map"></div>
 
 <script>
-/* إنشاء الخريطة */
-const map = L.map('map', {
-  zoomControl: true
-}).setView([36.2021, 37.1343], 13); // حلب
+/* خريطة */
+const map = L.map('map').setView([36.2021,37.1343],13);
 
-/* الطبقة العادية */
-const normalLayer = L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  { attribution: '© OpenStreetMap' }
+const normal = L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{attribution:'© OpenStreetMap'}
 ).addTo(map);
 
-/* طبقة التضاريس */
-const terrainLayer = L.tileLayer(
-  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-  { attribution: '© OpenTopoMap' }
+const terrain = L.tileLayer(
+'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
 );
 
-let terrainOn = false;
+L.Control.geocoder({defaultMarkGeocode:true}).addTo(map);
 
-/* بحث */
-L.Control.geocoder({
-  defaultMarkGeocode: true
-}).addTo(map);
+/* تدوير (شكلي) */
+let angle=0;
+map.on("contextmenu",()=>{
+  angle+=15;
+  document.getElementById("map").style.transform=`rotate(${angle}deg)`
+});
 
-/* تبديل التضاريس */
-function toggleTerrain() {
-  if (!terrainOn) {
-    map.removeLayer(normalLayer);
-    map.addLayer(terrainLayer);
-  } else {
-    map.removeLayer(terrainLayer);
-    map.addLayer(normalLayer);
-  }
-  terrainOn = !terrainOn;
+/* دخول محلي (تجريبي) */
+function login(){
+  if(!email.value||!password.value)
+    return alert("املأ الحقول");
+  localStorage.setItem("user",email.value);
+  alert("تم تسجيل الدخول");
+  closeLogin();
 }
 
-/* تدوير (محاكاة) */
-let angle = 0;
-function rotateMap() {
-  angle += 15;
-  document.getElementById("map").style.transform =
-    `rotate(${angle}deg)`;
+function register(){
+  login();
 }
 
-/* تسجيل خروج */
-function logout() {
+function logout(){
+  localStorage.removeItem("user");
   alert("تم تسجيل الخروج");
-  location.reload();
+}
+
+function openLogin(){
+  document.getElementById("loginBox").style.display="flex";
+}
+
+function closeLogin(){
+  document.getElementById("loginBox").style.display="none";
 }
 </script>
 
