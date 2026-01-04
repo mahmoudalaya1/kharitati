@@ -17,12 +17,17 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
 .list div:hover{background:#f0f0f0}
 .msgs{flex:1;padding:10px;overflow:auto}
-.msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
+.msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%;position:relative}
 .me{background:#b2f2bb;margin-left:auto}
+.small{font-size:11px;color:#555}
+.msg button{
+  position:absolute;top:2px;left:2px;
+  background:red;border:none;color:#fff;font-size:10px;cursor:pointer
+}
 .input{display:flex}
 input{flex:1;padding:10px}
 button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
-.small{font-size:11px;color:#555}
+.logout{background:#d63031}
 </style>
 
 <!-- Firebase -->
@@ -39,7 +44,6 @@ const firebaseConfig = {
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -62,25 +66,32 @@ const db = firebase.firestore();
 <!-- CHAT -->
 <div class="chat" id="chatBox">
 
-  <div class="sidebar">
-    <div class="header">كل المستخدمين</div>
-    <div class="list" id="allUsers"></div>
-
-    <div class="header">طلبات الصداقة</div>
-    <div class="list" id="requests"></div>
-
-    <div class="header">أصدقائي</div>
-    <div class="list" id="friends"></div>
+<div class="sidebar">
+  <div class="header">
+    المستخدمين
+    <button class="logout" onclick="logout()">خروج</button>
   </div>
 
-  <div class="messages">
-    <div class="header" id="chatHeader">اختر صديق</div>
-    <div class="msgs" id="msgs"></div>
-    <div class="input">
-      <input id="text" placeholder="اكتب رسالة">
-      <button onclick="send()">➤</button>
-    </div>
+  <div class="header">طلبات الصداقة</div>
+  <div class="list" id="requests"></div>
+
+  <div class="header">أصدقائي</div>
+  <div class="list" id="friends"></div>
+</div>
+
+<div class="messages">
+  <div class="header" id="chatHeader">
+    اختر صديق
+    <button class="logout" onclick="deleteChat()">حذف المحادثة</button>
   </div>
+
+  <div class="msgs" id="msgs"></div>
+
+  <div class="input">
+    <input id="text" placeholder="اكتب رسالة">
+    <button onclick="send()">➤</button>
+  </div>
+</div>
 </div>
 
 <script>
@@ -90,23 +101,19 @@ let currentChat=null;
 auth.onAuthStateChanged(user=>{
   if(user){
     db.collection("users").doc(user.uid).set({
-      email:user.email,
       username: username.value || "مستخدم",
       online:true
     },{merge:true});
 
     showChat();
-    loadUsers();
     loadRequests();
     loadFriends();
   }else showLogin();
 });
 
 window.addEventListener("beforeunload",()=>{
-  if(auth.currentUser){
-    db.collection("users").doc(auth.currentUser.uid)
-    .update({online:false});
-  }
+  if(auth.currentUser)
+    db.collection("users").doc(auth.currentUser.uid).update({online:false});
 });
 
 function doLogin(){
@@ -115,38 +122,12 @@ function doLogin(){
   .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
 }
 
-function showLogin(){
-  loginBox.style.display="flex";
-  chatBox.style.display="none";
-}
-function showChat(){
-  loginBox.style.display="none";
-  chatBox.style.display="flex";
+function logout(){
+  db.collection("users").doc(auth.currentUser.uid).update({online:false});
+  auth.signOut();
 }
 
-// USERS
-function loadUsers(){
-  db.collection("users").onSnapshot(s=>{
-    allUsers.innerHTML="";
-    s.forEach(d=>{
-      if(d.id===auth.currentUser.uid) return;
-      const div=document.createElement("div");
-      div.innerHTML=`➕ ${d.data().username}`;
-      div.onclick=()=>sendRequest(d.id);
-      allUsers.appendChild(div);
-    });
-  });
-}
-
-// FRIEND REQUEST
-function sendRequest(to){
-  db.collection("requests").add({
-    from:auth.currentUser.uid,
-    to
-  });
-}
-
-// LOAD REQUESTS
+// FRIEND REQUESTS
 function loadRequests(){
   db.collection("requests")
   .where("to","==",auth.currentUser.uid)
@@ -156,25 +137,20 @@ function loadRequests(){
       const u=await db.collection("users").doc(d.data().from).get();
       const div=document.createElement("div");
       div.innerHTML=`
-      ${u.data().username}
-      <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
-      <button onclick="reject('${d.id}')">✖</button>`;
+        ${u.data().username}
+        <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
+        <button onclick="reject('${d.id}')">✖</button>`;
       requests.appendChild(div);
     });
   });
 }
 
-function accept(reqId,friendId){
-  const chatId=[auth.currentUser.uid,friendId].sort().join("_");
-  db.collection("friends").doc(chatId).set({
-    users:[auth.currentUser.uid,friendId]
-  });
-  db.collection("requests").doc(reqId).delete();
-}
-
-function reject(id){
+function accept(id,fid){
+  const chatId=[auth.currentUser.uid,fid].sort().join("_");
+  db.collection("friends").doc(chatId).set({users:[auth.currentUser.uid,fid]});
   db.collection("requests").doc(id).delete();
 }
+function reject(id){db.collection("requests").doc(id).delete();}
 
 // FRIENDS
 function loadFriends(){
@@ -186,18 +162,12 @@ function loadFriends(){
       const fid=d.data().users.find(u=>u!==auth.currentUser.uid);
       const u=await db.collection("users").doc(fid).get();
       const div=document.createElement("div");
-      div.innerHTML=`
-      ${u.data().username} ${u.data().online?"🟢":"⚪"}
-      <button onclick="removeFriend('${d.id}')">❌</button>`;
+      div.innerHTML=`${u.data().username} ${u.data().online?"🟢":"⚪"} ❌`;
       div.onclick=()=>openChat(d.id,u.data().username);
+      div.ondblclick=()=>db.collection("friends").doc(d.id).delete();
       friends.appendChild(div);
     }
   });
-}
-
-function removeFriend(id){
-  if(confirm("حذف الصديق؟"))
-    db.collection("friends").doc(id).delete();
 }
 
 // CHAT
@@ -227,12 +197,30 @@ function listen(){
     s.forEach(d=>{
       const m=document.createElement("div");
       m.className="msg"+(d.data().from===auth.currentUser.uid?" me":"");
-      m.innerHTML=d.data().text+
-      `<div class="small">${d.data().status==="seen"?"✔✔":"✔"}</div>`;
+      m.innerHTML=`
+        ${d.data().text}
+        <button onclick="deleteMsg('${d.id}')">✖</button>
+        <div class="small">${d.data().status==="seen"?"✔✔":"✔"}</div>
+      `;
       if(d.data().from!==auth.currentUser.uid)
         d.ref.update({status:"seen"});
       msgs.appendChild(m);
     });
+  });
+}
+
+// حذف رسالة (عندك فقط)
+function deleteMsg(id){
+  db.collection("chats").doc(currentChat)
+  .collection("messages").doc(id).delete();
+}
+
+// حذف المحادثة كاملة (عند الطرفين)
+function deleteChat(){
+  if(!currentChat||!confirm("حذف المحادثة نهائياً؟")) return;
+  db.collection("chats").doc(currentChat)
+  .collection("messages").get().then(s=>{
+    s.forEach(d=>d.ref.delete());
   });
 }
 </script>
