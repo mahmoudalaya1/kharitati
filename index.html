@@ -2,24 +2,70 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>TEST MAP</title>
+<title>Kharitati Maps</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+html,body{
+  margin:0;
+  padding:0;
+  height:100%;
+  overflow:hidden;
+  font-family:Arial
 }
-#map {
-  position: fixed;
-  inset: 0;
+#map{
+  position:fixed;
+  inset:0;
+  z-index:1
+}
+
+/* Search */
+#searchBar{
+  position:fixed;
+  top:12px;
+  left:50%;
+  transform:translateX(-50%);
+  width:92%;
+  max-width:460px;
+  background:white;
+  padding:12px 16px;
+  border-radius:30px;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  z-index:1000
+}
+#searchBar input{
+  width:100%;
+  border:none;
+  outline:none;
+  font-size:16px
+}
+#results{font-size:14px}
+
+/* Bottom bar */
+#bottom{
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+  background:white;
+  border-radius:22px 22px 0 0;
+  box-shadow:0 -4px 20px rgba(0,0,0,.3);
+  padding:10px;
+  z-index:1000
+}
+#info{text-align:center;font-size:14px;margin-bottom:6px}
+#bottom .row{
+  display:flex;
+  justify-content:space-around
+}
+#bottom button{
+  background:none;
+  border:none;
+  font-size:22px;
+  cursor:pointer
 }
 </style>
 </head>
@@ -28,16 +74,132 @@ html, body {
 
 <div id="map"></div>
 
+<div id="searchBar">
+  <input id="search" placeholder="ابحث عن مكان">
+  <div id="results"></div>
+</div>
+
+<div id="bottom">
+  <div id="info">حدد وجهة</div>
+  <div class="row">
+    <button onclick="setMode('car')">🚗</button>
+    <button onclick="setMode('pedestrian')">🚶</button>
+    <button onclick="setMode('bicycle')">🚴</button>
+    <button onclick="toggleTraffic()">🚦</button>
+    <button onclick="startNav()">▶️</button>
+    <button onclick="locate()">📍</button>
+  </div>
+</div>
+
 <script>
-const map = L.map('map').setView([36.2, 37.13], 13);
+/* ===== HERE KEY ===== */
+const HERE_API_KEY = "PUT_YOUR_API_KEY_HERE";
+
+/* ===== MAP (OSM BASE) ===== */
+const map = L.map("map").setView([36.2,37.13],13);
 
 L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  }
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {maxZoom:19}
 ).addTo(map);
+
+/* ===== STATE ===== */
+let start=null,end=null,marker=null,routeLine=null,mode="car";
+let trafficLayer=null;
+
+/* ===== GPS ===== */
+navigator.geolocation.watchPosition(
+  p=>{
+    start=[p.coords.latitude,p.coords.longitude];
+    if(!marker) marker=L.marker(start).addTo(map);
+    else marker.setLatLng(start);
+    map.setView(start,16);
+  },
+  ()=>alert("لم يتم السماح بالموقع"),
+  {enableHighAccuracy:true}
+);
+
+/* ===== ROUTING (HERE) ===== */
+function setMode(m){mode=m;}
+
+function startNav(){
+  if(!start||!end){
+    alert("حدد وجهة");
+    return;
+  }
+  fetch(`https://router.hereapi.com/v8/routes?transportMode=${mode}&origin=${start[0]},${start[1]}&destination=${end[0]},${end[1]}&return=polyline,summary&apiKey=${HERE_API_KEY}`)
+  .then(r=>r.json())
+  .then(d=>{
+    if(routeLine) map.removeLayer(routeLine);
+    const s=d.routes[0].sections[0];
+    routeLine=L.polyline(decode(s.polyline),{
+      color:"#1976d2",weight:6
+    }).addTo(map);
+    document.getElementById("info").innerText=
+      `المتبقي ${(s.summary.length/1000).toFixed(1)} كم – ${(s.summary.duration/60).toFixed(0)} دقيقة`;
+  });
+}
+
+/* ===== CLICK DEST ===== */
+map.on("click",e=>{
+  end=[e.latlng.lat,e.latlng.lng];
+  document.getElementById("info").innerText="اضغط ▶️ لبدء الملاحة";
+});
+
+/* ===== SEARCH (HERE) ===== */
+const search=document.getElementById("search");
+const results=document.getElementById("results");
+
+search.oninput=()=>{
+  if(search.value.length<3){results.innerHTML="";return;}
+  fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${search.value}&apiKey=${HERE_API_KEY}`)
+  .then(r=>r.json())
+  .then(d=>{
+    results.innerHTML="";
+    d.items.slice(0,5).forEach(p=>{
+      const div=document.createElement("div");
+      div.textContent=p.title;
+      div.onclick=()=>{
+        end=[p.position.lat,p.position.lng];
+        map.setView(end,15);
+        results.innerHTML="";
+        document.getElementById("info").innerText="اضغط ▶️ لبدء الملاحة";
+      };
+      results.appendChild(div);
+    });
+  });
+};
+
+/* ===== TRAFFIC (HERE OVERLAY) ===== */
+function toggleTraffic(){
+  if(!trafficLayer){
+    trafficLayer=L.tileLayer(
+      "https://maps.hereapi.com/v3/traffic/flow/mc/{z}/{x}/{y}/png8?apiKey="+HERE_API_KEY
+    ).addTo(map);
+  }else{
+    map.removeLayer(trafficLayer);
+    trafficLayer=null;
+  }
+}
+
+/* ===== POLYLINE DECODE ===== */
+function decode(t){
+  let p=[],i=0,lat=0,lng=0;
+  while(i<t.length){
+    let b,s=0,r=0;
+    do{b=t.charCodeAt(i++)-63;r|=(b&31)<<s;s+=5}while(b>=32);
+    lat+=r&1?~(r>>1):(r>>1);
+    s=0;r=0;
+    do{b=t.charCodeAt(i++)-63;r|=(b&31)<<s;s+=5}while(b>=32);
+    lng+=r&1?~(r>>1):(r>>1);
+    p.push([lat/1e5,lng/1e5]);
+  }
+  return p;
+}
+
+function locate(){
+  if(start) map.setView(start,16);
+}
 </script>
 
 </body>
