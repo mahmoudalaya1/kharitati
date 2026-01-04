@@ -89,7 +89,10 @@ firebase.auth().signInAnonymously();
 const db = firebase.firestore();
 
 /* ================= MAP ================= */
-const map = L.map("map").setView([41.05,28.98],14);
+const map = L.map("map", {
+  zoomControl: false
+}).setView([41.05,28.98],14);
+
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 
 /* ================= STATE ================= */
