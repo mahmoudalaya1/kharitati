@@ -38,6 +38,20 @@ const firebaseConfig = {
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
+// تحميل كل المستخدمين تلقائياً
+function loadAllUsers(){
+  db.collection("users").onSnapshot(snap=>{
+    allUsers.innerHTML="";
+    snap.forEach(d=>{
+      if(d.id === auth.currentUser.uid) return;
+
+      const div = document.createElement("div");
+      div.innerText = "➕ " + d.data().username;
+      div.onclick = ()=>addFriendById(d.id);
+      allUsers.appendChild(div);
+    });
+  });
+}
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -65,11 +79,9 @@ const db   = firebase.firestore();
   <div class="sidebar">
     <div class="header">الأصدقاء</div>
 
-    <!-- SEARCH -->
-    <div style="padding:10px">
-      <input id="searchName" placeholder="ابحث عن صديق">
-      <button onclick="searchUser()">بحث</button>
-    </div>
+<div class="header">كل المستخدمين</div>
+<div class="list" id="allUsers"></div>
+
 
     <div class="list" id="searchResults"></div>
 
