@@ -92,24 +92,8 @@ auth.onAuthStateChanged(u=>{
   }
 });
 
-// ✅ LOGIN مصحح
-function login(){
-  if(!email.value || !pass.value || !username.value){
-    alert("املأ جميع الحقول");
-    return;
-  }
+<button onclick="doLogin()">دخول / تسجيل</button>
 
-  auth.signInWithEmailAndPassword(email.value, pass.value)
-  .then(()=>console.log("تم تسجيل الدخول"))
-  .catch(err=>{
-    console.warn("محاولة إنشاء حساب", err.message);
-    auth.createUserWithEmailAndPassword(email.value, pass.value)
-    .then(()=>alert("تم إنشاء الحساب"))
-    .catch(e=>{
-      alert("خطأ: " + e.message);
-      console.error(e);
-    });
-  });
 }
 
 // حفظ المستخدم
