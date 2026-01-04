@@ -2,71 +2,72 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>Mapbox Map</title>
+<title>MPBOX Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Mapbox CSS -->
-<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
-<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.1/mapbox-gl-geocoder.css" rel="stylesheet" />
-<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" rel="stylesheet" />
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-body { margin:0; padding:0; font-family:Arial }
-#map { position:absolute; top:0; bottom:0; width:100%; }
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial;
+}
+#map {
+  height: 100%;
+}
+
+/* زر تحديد الموقع */
+#locateBtn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.3);
+}
 </style>
 </head>
 
 <body>
+
+<button id="locateBtn">📍</button>
 <div id="map"></div>
 
-<!-- Mapbox JS -->
-<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.1/mapbox-gl-geocoder.min.js"></script>
-<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-
 <script>
-  // 🔑 API KEY
-  mapboxgl.accessToken = "pk.eyJ1IjoibWFobW91ZDEyMiIsImEiOiJjbWp6eGZuMmU2YjR2M2VzNWdvZG8zNnpzIn0.NHNOdln5ZCXjtDFya-Z0PQ";
-
   // إنشاء الخريطة
-  const map = new mapboxgl.Map({
-    container: "map",
-    style: "mapbox://styles/mapbox/streets-v12",
-    center: [35.2433, 38.9637], // تركيا
-    zoom: 6
+  var map = L.map('map').setView([36.2021, 37.1343], 13);
+
+  // OpenStreetMap بدون شعارات
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: ''
+  }).addTo(map);
+
+  // زر تحديد الموقع
+  document.getElementById('locateBtn').onclick = function () {
+    map.locate({setView: true, maxZoom: 16});
+  };
+
+  // عند العثور على الموقع
+  map.on('locationfound', function(e) {
+    L.marker(e.latlng).addTo(map)
+      .bindPopup("موقعك الحالي")
+      .openPopup();
   });
 
-  // أزرار التحكم
-  map.addControl(new mapboxgl.NavigationControl());
-  map.addControl(new mapboxgl.FullscreenControl());
-
-  // تحديد الموقع GPS
-  map.addControl(
-    new mapboxgl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,
-      showUserHeading: true
-    })
-  );
-
-  // البحث
-  map.addControl(
-    new MapboxGeocoder({
-      accessToken: mapboxgl.accessToken,
-      mapboxgl: mapboxgl,
-      placeholder: "ابحث عن مكان"
-    })
-  );
-
-  // الملاحة (المسار)
-  map.addControl(
-    new MapboxDirections({
-      accessToken: mapboxgl.accessToken,
-      unit: "metric",
-      language: "ar"
-    }),
-    "top-left"
-  );
+  map.on('locationerror', function() {
+    alert("تعذر تحديد موقعك");
+  });
 </script>
 
 </body>
