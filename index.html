@@ -24,18 +24,16 @@ html,body{margin:0;height:100%;font-family:Arial}
 /* لوحة التحكم */
 #panel{
   position:absolute;
-  top:10px;
-  left:10px;
+  top:15px;
+  left:15px;
   background:#fff;
   padding:12px;
   border-radius:12px;
-  width:280px;
+  width:260px;
   z-index:1000;
   box-shadow:0 4px 12px rgba(0,0,0,.25);
 }
-
-#panel h3{margin:0 0 8px 0}
-
+#panel h3{margin:0 0 8px}
 #panel button{
   width:100%;
   padding:9px;
@@ -45,16 +43,14 @@ html,body{margin:0;height:100%;font-family:Arial}
   background:#1976d2;
   color:#fff;
   cursor:pointer;
-  font-size:14px;
 }
-
 #panel button.gray{background:#555}
-#panel button.poi{background:#388e3c}
 
-#searchBox{
-  width:100%;
-  padding:8px;
-  margin-bottom:6px;
+/* أزرار الأماكن */
+#places button{
+  background:#eee;
+  color:#000;
+  margin-top:4px;
 }
 </style>
 </head>
@@ -62,24 +58,22 @@ html,body{margin:0;height:100%;font-family:Arial}
 <body>
 
 <div id="panel">
-  <h3>🗺️ خريطتي</h3>
-
-  <input id="searchBox" placeholder="ابحث عن مكان">
-
-  <button onclick="searchPlace()">🔍 بحث</button>
-
-  <button onclick="useMyLocation()">📍 موقعي كنقطة بداية</button>
-  <button onclick="selectStart()">🚩 اختيار نقطة البداية</button>
-  <button onclick="selectEnd()">🏁 اختيار نقطة الوصول</button>
-
-  <button onclick="startRoute()">🚗 بدء الرحلة</button>
+  <h3>🚗 الرحلة</h3>
+  <button onclick="useMyLocation()">📍 موقعي</button>
+  <button onclick="selectStart()">🅰️ نقطة البداية</button>
+  <button onclick="selectEnd()">🅱️ نقطة الوصول</button>
+  <button onclick="startRoute()">▶️ ابدأ الرحلة</button>
   <button class="gray" onclick="clearRoute()">❌ مسح المسار</button>
 
   <hr>
 
-  <button class="poi" onclick="searchPOI('fuel')">⛽ وقود</button>
-  <button class="poi" onclick="searchPOI('hotel')">🏨 فندق</button>
-  <button class="poi" onclick="searchPOI('pharmacy')">💊 صيدلية</button>
+  <h3>🔍 بحث الأماكن</h3>
+  <div id="places">
+    <button onclick="searchPOI('fuel')">⛽ وقود</button>
+    <button onclick="searchPOI('hotel')">🏨 فندق</button>
+    <button onclick="searchPOI('pharmacy')">💊 صيدلية</button>
+    <button onclick="searchPOI('restaurant')">🍽️ مطعم</button>
+  </div>
 </div>
 
 <div id="map"></div>
@@ -88,42 +82,26 @@ html,body{margin:0;height:100%;font-family:Arial}
 /* إنشاء الخريطة */
 const map = L.map('map').setView([36.2021,37.1343],13);
 
-L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  { attribution:'© OpenStreetMap' }
-).addTo(map);
-
-/* البحث الذكي */
-const geocoder = L.Control.geocoder({
-  defaultMarkGeocode:false
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap'
 }).addTo(map);
 
-function searchPlace(){
-  geocoder.options.geocoder.geocode(
-    searchBox.value,
-    results=>{
-      if(!results.length) return alert("لم يتم العثور");
-      const r = results[0];
-      map.setView(r.center,15);
-      L.marker(r.center).addTo(map)
-        .bindPopup(r.name).openPopup();
-    }
-  );
-}
+/* بحث نصي */
+L.Control.geocoder({defaultMarkGeocode:true}).addTo(map);
 
-/* نقاط الملاحة */
+/* متغيرات */
 let startPoint=null;
 let endPoint=null;
+let routing=null;
 let selecting=null;
-let routingControl=null;
 let markers=[];
 
 /* موقعي الحقيقي */
 function useMyLocation(){
   navigator.geolocation.getCurrentPosition(pos=>{
     startPoint=L.latLng(pos.coords.latitude,pos.coords.longitude);
-    addMarker(startPoint,"📍 موقعي");
     map.setView(startPoint,15);
+    addMarker(startPoint,"📍 موقعي");
   },()=>alert("لم يتم السماح بالموقع"));
 }
 
@@ -140,61 +118,73 @@ function selectEnd(){
 map.on("click",e=>{
   if(selecting==="start"){
     startPoint=e.latlng;
-    addMarker(startPoint,"🚩 بداية");
+    addMarker(startPoint,"🅰️ بداية");
   }
   if(selecting==="end"){
     endPoint=e.latlng;
-    addMarker(endPoint,"🏁 وصول");
+    addMarker(endPoint,"🅱️ وصول");
   }
   selecting=null;
 });
 
-/* إضافة علامة */
-function addMarker(latlng,text){
-  const m=L.marker(latlng).addTo(map).bindPopup(text);
-  markers.push(m);
-}
-
 /* بدء الرحلة */
 function startRoute(){
-  if(!startPoint||!endPoint)
-    return alert("حدد البداية والوصول");
+  if(!startPoint||!endPoint){
+    alert("حدد البداية والوصول");
+    return;
+  }
+  if(routing) map.removeControl(routing);
 
-  if(routingControl)
-    map.removeControl(routingControl);
-
-  routingControl=L.Routing.control({
+  routing=L.Routing.control({
     waypoints:[startPoint,endPoint],
     routeWhileDragging:false,
     addWaypoints:false,
+    draggableWaypoints:false,
     show:false
   }).addTo(map);
 }
 
 /* مسح */
 function clearRoute(){
-  if(routingControl) map.removeControl(routingControl);
-  routingControl=null;
+  if(routing) map.removeControl(routing);
+  routing=null;
   startPoint=null;
   endPoint=null;
   markers.forEach(m=>map.removeLayer(m));
   markers=[];
 }
 
-/* البحث عن أماكن قريبة (POI) */
+/* إضافة ماركر */
+function addMarker(latlng,text){
+  const m=L.marker(latlng).addTo(map).bindPopup(text).openPopup();
+  markers.push(m);
+}
+
+/* بحث أماكن (Overpass API) */
 function searchPOI(type){
-  if(!map.getCenter()) return;
+  clearMarkersOnly();
 
-  const c=map.getCenter();
-  const query=`https://nominatim.openstreetmap.org/search?format=json&q=${type}&limit=10&lat=${c.lat}&lon=${c.lng}`;
+  const center=map.getCenter();
+  const query=`
+  [out:json];
+  node(around:2000,${center.lat},${center.lng})["amenity"="${type}"];
+  out;
+  `;
 
-  fetch(query)
-    .then(r=>r.json())
-    .then(data=>{
-      data.forEach(p=>{
-        addMarker([p.lat,p.lon],p.display_name);
-      });
+  fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:query})
+  .then(r=>r.json())
+  .then(data=>{
+    data.elements.forEach(p=>{
+      const m=L.marker([p.lat,p.lon]).addTo(map)
+        .bindPopup(type);
+      markers.push(m);
     });
+  });
+}
+
+function clearMarkersOnly(){
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
 }
 </script>
 
