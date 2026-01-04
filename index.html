@@ -7,6 +7,9 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+if (!navigator.geolocation) {
+  alert("المتصفح لا يدعم GPS");
+}
 
 <style>
 html,body{margin:0;padding:0;height:100%;overflow:hidden;font-family:Arial}
@@ -146,11 +149,9 @@ map.on("zoomstart",()=>follow=false);
 let watchId = null;
 
 function enableGPS(){
-  if(watchId) return; // إذا شغال لا تعيد
-
-  watchId = navigator.geolocation.watchPosition(
-    p=>{
-      start = [p.coords.latitude, p.coords.longitude];
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      start = [position.coords.latitude, position.coords.longitude];
 
       if(!startMarker){
         startMarker = L.marker(start).addTo(map);
@@ -158,20 +159,25 @@ function enableGPS(){
         startMarker.setLatLng(start);
       }
 
-      if(follow){
-        map.setView(start,17,{animate:true});
-      }
-
+      map.setView(start,17);
       document.getElementById("gpsCard").style.display="none";
       info.innerText = "تم تشغيل GPS ✔️";
+
+      // تشغيل التتبع المستمر
+      navigator.geolocation.watchPosition(p=>{
+        start = [p.coords.latitude,p.coords.longitude];
+        startMarker.setLatLng(start);
+        if(follow) map.setView(start,17,{animate:true});
+      },console.error,{enableHighAccuracy:true});
     },
-    err=>{
-      alert("لازم تسمح بالموقع من المتصفح");
-      console.error(err);
+    error => {
+      alert("❌ لازم تسمح بالموقع من إعدادات المتصفح");
+      console.error(error);
     },
     {enableHighAccuracy:true}
   );
 }
+
 
 /* ================= MODE ================= */
 function setMode(m){
