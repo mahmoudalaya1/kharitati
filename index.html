@@ -1,1 +1,177 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>خريطتي</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Routing -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css">
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+<style>
+html,body{margin:0;height:100%;font-family:Arial}
+#map{height:100%;width:100%}
+
+#topBar{
+  position:fixed;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  width:92%;
+  max-width:420px;
+  background:white;
+  border-radius:30px;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  padding:8px 12px;
+  z-index:1000;
+}
+
+#topBar input{
+  border:none;
+  outline:none;
+  width:100%;
+  font-size:16px;
+}
+
+#suggestions{
+  background:white;
+  border-radius:12px;
+  margin-top:6px;
+  display:none;
+  max-height:200px;
+  overflow:auto;
+}
+
+.sug{
+  padding:10px;
+  border-bottom:1px solid #eee;
+  cursor:pointer;
+}
+
+#buttons{
+  position:fixed;
+  right:10px;
+  top:90px;
+  z-index:1000;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+button{
+  border:none;
+  border-radius:8px;
+  padding:10px;
+  background:#1976d2;
+  color:white;
+  cursor:pointer;
+}
+
+.mode button{background:#555}
+</style>
+</head>
+
+<body>
+
+<div id="topBar">
+  <input id="search" placeholder="ابحث عن مكان">
+  <div id="suggestions"></div>
+</div>
+
+<div id="buttons">
+  <button onclick="setMode('car')">🚗</button>
+  <button onclick="setMode('foot')">🚶‍♂️</button>
+  <button onclick="setMode('bike')">🚴</button>
+  <button onclick="toggleTerrain()">🗻</button>
+  <button onclick="toggleDark()">🌙</button>
+  <button onclick="clearRoute()">❌</button>
+</div>
+
+<div id="map"></div>
+
+<script>
+const map=L.map('map').setView([36.2,37.13],13);
+
+const normal=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const terrain=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
+const dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+
+let darkOn=false,terrainOn=false;
+let routing=null,mode="car";
+
+function toggleDark(){
+  darkOn?map.removeLayer(dark):map.addLayer(dark);
+  darkOn=!darkOn;
+}
+function toggleTerrain(){
+  terrainOn?map.removeLayer(terrain):map.addLayer(terrain);
+  terrainOn=!terrainOn;
+}
+
+navigator.geolocation.getCurrentPosition(p=>{
+  map.setView([p.coords.latitude,p.coords.longitude],15);
+});
+
+const search=document.getElementById("search");
+const sug=document.getElementById("suggestions");
+
+search.addEventListener("input",()=>{
+  if(search.value.length<3){sug.style.display="none";return;}
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${search.value}`)
+  .then(r=>r.json()).then(d=>{
+    sug.innerHTML="";
+    d.slice(0,5).forEach(p=>{
+      const div=document.createElement("div");
+      div.className="sug";
+      div.innerText=p.display_name;
+      div.onclick=()=>selectPlace(p);
+      sug.appendChild(div);
+    });
+    sug.style.display="block";
+  });
+});
+
+let start=null,end=null;
+
+function selectPlace(p){
+  sug.style.display="none";
+  map.setView([p.lat,p.lon],15);
+  if(!start){start=L.latLng(p.lat,p.lon);}
+  else{end=L.latLng(p.lat,p.lon);drawRoute();}
+}
+
+function setMode(m){mode=m; if(start&&end)drawRoute();}
+
+function drawRoute(){
+  if(routing)map.removeControl(routing);
+  routing=L.Routing.control({
+    waypoints:[start,end],
+    router:L.Routing.osrmv1({profile:mode}),
+    addWaypoints:false,
+    draggableWaypoints:false
+  }).addTo(map);
+}
+
+function clearRoute(){
+  if(routing)map.removeControl(routing);
+  routing=null;start=null;end=null;
+}
+
+/* Compass */
+if(window.DeviceOrientationEvent){
+  window.addEventListener("deviceorientation",e=>{
+    if(e.alpha){
+      map.getContainer().style.transform=`rotate(${-e.alpha}deg)`;
+    }
+  });
+}
+</script>
+
+</body>
+</html>
 
