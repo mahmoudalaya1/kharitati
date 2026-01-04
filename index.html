@@ -2,206 +2,85 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>خريطتي</title>
+<title>Chat Demo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <style>
-html,body{
-  margin:0;
-  height:100%;
-  font-family:Arial, sans-serif;
-}
-#map{height:100%}
-
-/* ===== App Bar ===== */
-#appBar{
-  position:fixed;
-  top:0;left:0;right:0;
-  height:56px;
-  background:#2f3f9e;
-  color:#fff;
-  display:flex;
-  align-items:center;
-  padding:0 12px;
-  z-index:1200;
-}
-#title{flex:1;font-weight:bold}
-#more{font-size:22px}
-
-/* ===== Search ===== */
-#searchBox{
-  position:fixed;
-  top:64px;
-  left:12px;
-  right:12px;
-  background:#fff;
-  border-radius:14px;
-  display:flex;
-  padding:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,.3);
-  z-index:1200;
-}
-#searchInput{
-  flex:1;
-  border:none;
-  font-size:15px;
-  outline:none;
-}
-#results{
-  position:fixed;
-  top:120px;
-  left:12px;
-  right:12px;
-  background:#fff;
-  border-radius:14px;
-  max-height:55vh;
-  overflow:auto;
-  box-shadow:0 6px 18px rgba(0,0,0,.3);
-  z-index:1200;
-}
-#results div{
-  padding:12px;
-  border-bottom:1px solid #eee;
-  cursor:pointer;
-}
-#results div:hover{background:#f5f5f5}
-.small{font-size:12px;color:#777}
-
-/* ===== Buttons ===== */
-.map-btn{
-  position:fixed;
-  right:12px;
-  width:44px;height:44px;
-  background:#fff;
-  border:none;
-  border-radius:8px;
-  font-size:22px;
-  box-shadow:0 4px 10px rgba(0,0,0,.25);
-  z-index:1100;
-}
-#zoomIn{top:190px}
-#zoomOut{top:240px}
-#locate{top:290px;color:#1976d2}
-#startNav{top:340px;color:#ff9800}
-
-/* ===== User dot ===== */
-.user-dot{
-  width:16px;height:16px;
-  background:#1976d2;
-  border:3px solid #fff;
-  border-radius:50%;
-  box-shadow:0 0 0 6px rgba(25,118,210,.3);
-}
+body{margin:0;font-family:Arial;background:#ece5dd}
+.login, .chat{display:none;height:100vh}
+.login{display:flex;align-items:center;justify-content:center}
+.login box{background:#fff;padding:20px;border-radius:10px}
+.chat{display:flex}
+.sidebar{width:30%;background:#fff;border-left:1px solid #ccc}
+.messages{flex:1;display:flex;flex-direction:column}
+.header{background:#075e54;color:#fff;padding:10px}
+.list{padding:10px}
+.msgs{flex:1;padding:10px;overflow:auto}
+.msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
+.input{display:flex}
+input{flex:1;padding:10px;border:none}
+button{padding:10px;background:#25d366;border:none;color:#fff}
 </style>
 </head>
 
 <body>
 
-<div id="appBar">
-  <div id="title">MAHMOUD ALAYA</div>
-  <div id="more">⋮</div>
+<!-- LOGIN -->
+<div class="login" id="login">
+  <div class="box">
+    <h3>تسجيل الدخول</h3>
+    <input id="username" placeholder="اسم المستخدم"><br><br>
+    <button onclick="login()">دخول</button>
+  </div>
 </div>
 
-<div id="searchBox">
-  <input id="searchInput" placeholder="ابحث عن مكان">
+<!-- CHAT -->
+<div class="chat" id="chat">
+  <div class="sidebar">
+    <div class="header">المحادثات</div>
+    <div class="list">💬 دردشة عامة</div>
+  </div>
+
+  <div class="messages">
+    <div class="header" id="userHeader"></div>
+    <div class="msgs" id="msgs"></div>
+    <div class="input">
+      <input id="text" placeholder="اكتب رسالة">
+      <button onclick="send()">➤</button>
+    </div>
+  </div>
 </div>
-<div id="results"></div>
-
-<button id="zoomIn" class="map-btn">＋</button>
-<button id="zoomOut" class="map-btn">－</button>
-<button id="locate" class="map-btn">📍</button>
-<button id="startNav" class="map-btn">▶️</button>
-
-<div id="map"></div>
 
 <script>
-/* ===== MAP ===== */
-const map = L.map('map',{zoomControl:false})
-.setView([41.0476,28.9465],14);
+let user = localStorage.getItem("user");
 
-L.tileLayer(
-'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-{maxZoom:19}
-).addTo(map);
+if(user){
+  startChat();
+}else{
+  document.getElementById("login").style.display="flex";
+}
 
-/* ===== STATE ===== */
-let userLatLng=null;
-let userMarker=null;
-let destMarker=null;
-let routeLine=null;
+function login(){
+  let u = document.getElementById("username").value;
+  if(!u) return alert("ادخل اسم");
+  localStorage.setItem("user",u);
+  startChat();
+}
 
-/* ===== Controls ===== */
-zoomIn.onclick=()=>map.zoomIn();
-zoomOut.onclick=()=>map.zoomOut();
+function startChat(){
+  document.getElementById("login").style.display="none";
+  document.getElementById("chat").style.display="flex";
+  document.getElementById("userHeader").innerText = "👤 " + localStorage.getItem("user");
+}
 
-/* ===== Location ===== */
-locate.onclick=()=>{
-  map.locate({watch:true,setView:true,enableHighAccuracy:true});
-};
-
-map.on("locationfound",e=>{
-  userLatLng=e.latlng;
-  if(!userMarker){
-    userMarker=L.marker(e.latlng,{
-      icon:L.divIcon({
-        className:"",
-        html:'<div class="user-dot"></div>',
-        iconSize:[16,16]
-      })
-    }).addTo(map);
-  }else{
-    userMarker.setLatLng(e.latlng);
-  }
-});
-
-/* ===== Search ===== */
-searchInput.oninput=()=>{
-  const q=searchInput.value.trim();
-  if(q.length<2){results.innerHTML="";return;}
-
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&accept-language=ar`)
-  .then(r=>r.json())
-  .then(data=>{
-    results.innerHTML="";
-    data.slice(0,8).forEach(p=>{
-      let d="";
-      if(userLatLng){
-        d=(map.distance(userLatLng,[p.lat,p.lon])/1000).toFixed(1)+" كم";
-      }
-      const div=document.createElement("div");
-      div.innerHTML=`<b>${p.display_name.split(",")[0]}</b><br>
-      <span class="small">${p.display_name}</span>
-      <span class="small"> ${d}</span>`;
-      div.onclick=()=>{
-        const ll=[p.lat,p.lon];
-        map.setView(ll,16);
-        if(destMarker) map.removeLayer(destMarker);
-        destMarker=L.marker(ll).addTo(map);
-        results.innerHTML="";
-      };
-      results.appendChild(div);
-    });
-  });
-};
-
-/* ===== Navigation ===== */
-startNav.onclick=()=>{
-  if(!userLatLng||!destMarker){alert("حدد وجهة");return;}
-  const a=userLatLng;
-  const b=destMarker.getLatLng();
-  fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`)
-  .then(r=>r.json())
-  .then(d=>{
-    if(routeLine) map.removeLayer(routeLine);
-    routeLine=L.geoJSON(d.routes[0].geometry,{
-      style:{color:"#1976d2",weight:6}
-    }).addTo(map);
-  });
-};
+function send(){
+  let text = document.getElementById("text");
+  if(!text.value) return;
+  let box = document.createElement("div");
+  box.className="msg";
+  box.innerText = localStorage.getItem("user")+": "+text.value;
+  document.getElementById("msgs").appendChild(box);
+  text.value="";
+}
 </script>
 
 </body>
