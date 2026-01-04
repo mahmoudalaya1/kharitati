@@ -2,72 +2,72 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>MAHMOUD Map</title>
+<title>MPBOX Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  font-family: Arial;
-}
-#map {
-  height: 100%;
-}
+html,body{margin:0;height:100%;font-family:Arial}
+#map{height:100%}
 
-/* زر تحديد الموقع */
-#locateBtn {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-  background: white;
-  border: none;
-  border-radius: 50%;
-  width: 52px;
-  height: 52px;
-  font-size: 22px;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,.3);
+/* أزرار مثل Mapbox */
+.map-btn{
+  position:fixed;
+  right:16px;
+  width:48px;
+  height:48px;
+  border-radius:12px;
+  background:#1e1e1e;
+  color:#fff;
+  border:none;
+  font-size:20px;
+  box-shadow:0 6px 16px rgba(0,0,0,.4);
+  cursor:pointer;
+  z-index:1000;
 }
+#locate{top:20px}
+#zoomIn{top:80px}
+#zoomOut{top:140px}
 </style>
 </head>
 
 <body>
 
-<button id="locateBtn">📍</button>
+<button id="locate" class="map-btn">📍</button>
+<button id="zoomIn" class="map-btn">＋</button>
+<button id="zoomOut" class="map-btn">－</button>
+
 <div id="map"></div>
 
 <script>
-  // إنشاء الخريطة
-  var map = L.map('map').setView([36.2021, 37.1343], 13);
+var map = L.map('map', {
+  zoomControl:false
+}).setView([36.2021, 37.1343], 13);
 
-  // OpenStreetMap بدون شعارات
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: ''
+// ستايل داكن (يشبه Mapbox Dark)
+L.tileLayer(
+  'https://tiles.stadiamaps.com/tiles/alidade_dark/{z}/{x}/{y}{r}.png',
+  { attribution:'' }
+).addTo(map);
+
+// أزرار
+document.getElementById('zoomIn').onclick=()=>map.zoomIn();
+document.getElementById('zoomOut').onclick=()=>map.zoomOut();
+
+document.getElementById('locate').onclick=()=>{
+  map.locate({setView:true,maxZoom:16});
+};
+
+map.on('locationfound',e=>{
+  L.circleMarker(e.latlng,{
+    radius:8,
+    color:'#00c3ff',
+    fillColor:'#00c3ff',
+    fillOpacity:1
   }).addTo(map);
-
-  // زر تحديد الموقع
-  document.getElementById('locateBtn').onclick = function () {
-    map.locate({setView: true, maxZoom: 16});
-  };
-
-  // عند العثور على الموقع
-  map.on('locationfound', function(e) {
-    L.marker(e.latlng).addTo(map)
-      .bindPopup("موقعك الحالي")
-      .openPopup();
-  });
-
-  map.on('locationerror', function() {
-    alert("تعذر تحديد موقعك");
-  });
+});
 </script>
 
 </body>
