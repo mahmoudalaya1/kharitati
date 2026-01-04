@@ -9,44 +9,42 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  height:100%;
-  overflow:hidden;
-  font-family:Arial
-}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;font-family:Arial}
 #map{position:fixed;inset:0}
 
 /* Bottom bar */
 #bottom{
-  position:fixed;
-  bottom:0;
-  left:0;
-  width:100%;
-  background:white;
-  border-radius:22px 22px 0 0;
+  position:fixed;bottom:0;left:0;width:100%;
+  background:white;border-radius:22px 22px 0 0;
   box-shadow:0 -4px 20px rgba(0,0,0,.3);
-  padding:10px;
-  z-index:1000
+  padding:10px;z-index:1000
 }
-#info{
-  text-align:center;
-  font-size:14px;
-  margin-bottom:6px
-}
-.row{
-  display:flex;
-  justify-content:space-around;
-  align-items:center
-}
-button{
-  background:none;
-  border:none;
-  font-size:22px;
-  cursor:pointer
-}
+#info{text-align:center;font-size:14px;margin-bottom:6px}
+.row{display:flex;justify-content:space-around;align-items:center}
+button{background:none;border:none;font-size:22px;cursor:pointer}
 .active{color:#1976d2;font-weight:bold}
+
+/* Offer badge */
+.offer-badge{
+  background:white;
+  padding:4px 6px;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.3);
+  font-size:12px;
+  white-space:nowrap
+}
+
+/* Modal */
+.modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.4);
+  display:none;align-items:center;justify-content:center;z-index:2000
+}
+.modal-content{
+  background:white;padding:20px;border-radius:16px;width:90%;max-width:320px
+}
+.modal-content input,select{
+  width:100%;margin:6px 0;padding:8px
+}
 </style>
 </head>
 
@@ -59,36 +57,53 @@ button{
   <div class="row">
     <button id="walkBtn" onclick="setMode('foot')">🚶‍♂️</button>
     <button id="carBtn" onclick="setMode('car')">🚗</button>
+    <button onclick="toggleFollow()">🧭</button>
     <button onclick="startNav()">▶️</button>
     <button onclick="cancelNav()">❌</button>
     <button onclick="goBack()">🔙</button>
+    <button onclick="openOffer()">➕</button>
+  </div>
+</div>
+
+<!-- Add Offer Modal -->
+<div class="modal" id="offerModal">
+  <div class="modal-content">
+    <h3>إضافة عرض</h3>
+    <input id="offerTitle" placeholder="مثال: بيع دكان">
+    <select id="offerSide">
+      <option value="right">يمين الطريق</option>
+      <option value="left">يسار الطريق</option>
+      <option value="front">أمامك</option>
+    </select>
+    <button onclick="saveOffer()">حفظ</button>
+    <button onclick="closeOffer()">إلغاء</button>
   </div>
 </div>
 
 <script>
 /* ================= MAP ================= */
-const map = L.map("map").setView([41.05,28.98],14);
+const map=L.map("map").setView([41.05,28.98],15);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 
 /* ================= STATE ================= */
-let start=null,end=null;
-let startMarker=null,endMarker=null;
-let routeLine=null;
-let mode="foot";
-let follow=true;
-let historyState=null;
+let start=null,end=null,startMarker=null,endMarker=null,routeLine=null;
+let mode="foot",follow=true,historyEnd=null;
+let offers=JSON.parse(localStorage.getItem("offers")||"[]");
 
-/* ================= GPS (FOLLOW ME) ================= */
+/* ================= FOLLOW STOP ================= */
+map.on("dragstart",()=>follow=false);
+map.on("zoomstart",()=>follow=false);
+
+/* ================= GPS ================= */
 navigator.geolocation.watchPosition(
-  p=>{
-    start=[p.coords.latitude,p.coords.longitude];
-    if(!startMarker) startMarker=L.marker(start).addTo(map);
-    else startMarker.setLatLng(start);
-
-    if(follow) map.setView(start,17,{animate:true});
-  },
-  ()=>alert("GPS غير متاح"),
-  {enableHighAccuracy:true}
+ p=>{
+  start=[p.coords.latitude,p.coords.longitude];
+  if(!startMarker) startMarker=L.marker(start).addTo(map);
+  else startMarker.setLatLng(start);
+  if(follow) map.setView(start,17,{animate:true});
+ },
+ ()=>alert("GPS غير متاح"),
+ {enableHighAccuracy:true}
 );
 
 /* ================= MODE ================= */
@@ -98,96 +113,83 @@ function setMode(m){
   carBtn.classList.remove("active");
   if(m==="foot") walkBtn.classList.add("active");
   if(m==="car") carBtn.classList.add("active");
+  info.innerText=m==="foot"?"وضع المشي":"وضع السيارة";
+}
 
-  speak(m==="foot"?"وضع المشي":"وضع السيارة");
+/* ================= FOLLOW ================= */
+function toggleFollow(){
+  follow=!follow;
+  info.innerText=follow?"تتبع حي مفعّل":"تم إيقاف التتبع";
 }
 
 /* ================= DEST ================= */
 map.on("click",e=>{
   end=[e.latlng.lat,e.latlng.lng];
-
   if(endMarker) map.removeLayer(endMarker);
   endMarker=L.marker(end).addTo(map);
-
-  historyState={end:[...end]};
-
-  info.innerText="تم تحديد الوجهة ✔️ اضغط ▶️";
+  historyEnd=[...end];
+  info.innerText="تم تحديد الوجهة ✔️";
 });
 
-/* ================= START NAV ================= */
+/* ================= NAV ================= */
 function startNav(){
-  if(!start||!end){
-    alert("حدد وجهة أولًا");
-    return;
-  }
-
-  const url =
-    `https://router.project-osrm.org/route/v1/${mode}/`+
-    `${start[1]},${start[0]};${end[1]},${end[0]}`+
-    `?overview=full&geometries=geojson&steps=true`;
-
-  fetch(url)
-    .then(r=>r.json())
-    .then(d=>{
-      if(d.code!=="Ok"){
-        alert("لم يتم إيجاد مسار");
-        return;
-      }
-
-      if(routeLine) map.removeLayer(routeLine);
-
-      routeLine=L.geoJSON(d.routes[0].geometry,{
-        style:{color:"#1976d2",weight:6}
-      }).addTo(map);
-
-      const dist=(d.routes[0].distance/1000).toFixed(1);
-      info.innerText=`بدأت الملاحة – ${dist} كم`;
-
-      speak("ابدأ السير");
-      speakSteps(d.routes[0].legs[0].steps);
-    });
-}
-
-/* ================= CANCEL ================= */
-function cancelNav(){
+ if(!start||!end){alert("حدد وجهة");return;}
+ const url=`https://router.project-osrm.org/route/v1/${mode}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+ fetch(url).then(r=>r.json()).then(d=>{
+  if(d.code!=="Ok"){alert("لا يوجد مسار");return;}
   if(routeLine) map.removeLayer(routeLine);
-  if(endMarker) map.removeLayer(endMarker);
-  routeLine=null;
-  endMarker=null;
-  end=null;
-  info.innerText="تم الإلغاء ❌";
-  speak("تم إلغاء الملاحة");
+  routeLine=L.geoJSON(d.routes[0].geometry,{style:{color:"#1976d2",weight:6}}).addTo(map);
+  info.innerText="بدأت الملاحة";
+ });
 }
 
-/* ================= BACK (مرة واحدة) ================= */
+function cancelNav(){
+ if(routeLine) map.removeLayer(routeLine);
+ if(endMarker) map.removeLayer(endMarker);
+ routeLine=null;end=null;
+ info.innerText="تم الإلغاء";
+}
+
 function goBack(){
-  if(!historyState){
-    alert("لا يوجد رجوع");
-    return;
-  }
-  end=[...historyState.end];
-  endMarker=L.marker(end).addTo(map);
-  info.innerText="تم الرجوع خطوة واحدة 🔙";
-  historyState=null;
+ if(!historyEnd){alert("لا يوجد رجوع");return;}
+ end=[...historyEnd];
+ endMarker=L.marker(end).addTo(map);
+ historyEnd=null;
+ info.innerText="رجوع خطوة واحدة";
 }
 
-/* ================= VOICE ================= */
-function speak(text){
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang="ar";
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+/* ================= OFFERS ================= */
+function offerIcon(o){
+ let a=o.side==="right"?"➡️":o.side==="left"?"⬅️":"⬆️";
+ return L.divIcon({className:"",html:`<div class="offer-badge">${a} ${o.title}</div>`});
 }
 
-function speakSteps(steps){
-  let i=0;
-  function next(){
-    if(i>=steps.length) return;
-    speak(steps[i].maneuver.instruction || "تابع");
-    i++;
-    setTimeout(next,4000);
-  }
-  next();
+function renderOffers(){
+ offers.forEach(o=>{
+  L.marker([o.lat,o.lng],{icon:offerIcon(o)})
+   .addTo(map)
+   .bindPopup(o.title);
+ });
+}
+renderOffers();
+
+/* ================= ADD OFFER ================= */
+function openOffer(){
+ if(!start){alert("انتظر تحديد موقعك");return;}
+ document.getElementById("offerModal").style.display="flex";
+}
+function closeOffer(){
+ document.getElementById("offerModal").style.display="none";
+}
+function saveOffer(){
+ const title=offerTitle.value;
+ const side=offerSide.value;
+ if(!title){alert("اكتب وصف");return;}
+ const offer={title,side,lat:start[0],lng:start[1]};
+ offers.push(offer);
+ localStorage.setItem("offers",JSON.stringify(offers));
+ L.marker([offer.lat,offer.lng],{icon:offerIcon(offer)}).addTo(map);
+ closeOffer();
 }
 </script>
 
