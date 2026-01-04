@@ -12,7 +12,6 @@
 html,body{margin:0;padding:0;height:100%;font-family:Arial}
 #map{height:100%}
 
-/* زر تحديد الموقع */
 #locateBtn{
   position:fixed;
   top:20px;
@@ -28,7 +27,6 @@ html,body{margin:0;padding:0;height:100%;font-family:Arial}
   cursor:pointer;
 }
 
-/* Bottom bar */
 #bottom{
   position:fixed;
   bottom:0;left:0;width:100%;
@@ -43,7 +41,6 @@ html,body{margin:0;padding:0;height:100%;font-family:Arial}
 button{background:none;border:none;font-size:22px;cursor:pointer}
 .active{color:#1976d2;font-weight:bold}
 
-/* سهم الاتجاه */
 .arrow{
   width:0;height:0;
   border-left:10px solid transparent;
@@ -70,12 +67,14 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
   </div>
 </div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
+/* ================= GLOBAL ================= */
+let compassAngle = 0;
+
 /* ================= FIREBASE ================= */
 firebase.initializeApp({
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
@@ -89,10 +88,7 @@ firebase.auth().signInAnonymously();
 const db = firebase.firestore();
 
 /* ================= MAP ================= */
-const map = L.map("map", {
-  zoomControl: false
-}).setView([41.05,28.98],14);
-
+const map = L.map("map",{zoomControl:false}).setView([41.05,28.98],14);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 
 /* ================= STATE ================= */
@@ -100,25 +96,30 @@ let start=null,end=null;
 let arrowMarker=null,endMarker=null,routeLine=null;
 let follow=true;
 let mode="foot";
-let lastPos=null;
 let watchId=null;
-let heading=0;
 
-/* ================= GPS + ARROW (محسّن) ================= */
+/* ================= COMPASS ================= */
+if (window.DeviceOrientationEvent) {
+  window.addEventListener("deviceorientation", e=>{
+    if(e.alpha!==null){
+      compassAngle = 360 - e.alpha;
+      if(arrowMarker){
+        const el = arrowMarker.getElement();
+        if(el) el.style.transform = `rotate(${compassAngle}deg)`;
+      }
+    }
+  },true);
+}
+
+/* ================= GPS ================= */
 function enableGPS(){
-  if(!navigator.geolocation){
-    alert("المتصفح لا يدعم GPS");
-    return;
-  }
   if(watchId) return;
-
   watchId = navigator.geolocation.watchPosition(p=>{
     start=[p.coords.latitude,p.coords.longitude];
 
     if(!arrowMarker){
-      arrowMarker = L.marker(start,{
+      arrowMarker=L.marker(start,{
         icon:L.divIcon({
-          className:"",
           html:'<div class="arrow"></div>',
           iconSize:[22,22],
           iconAnchor:[11,11]
@@ -128,22 +129,6 @@ function enableGPS(){
       arrowMarker.setLatLng(start);
     }
 
-    /* اتجاه أدق */
-    if(p.coords.heading !== null){
-      heading = p.coords.heading;
-    }else if(lastPos){
-      heading = Math.atan2(
-        start[1]-lastPos[1],
-        start[0]-lastPos[0]
-      ) * 180 / Math.PI;
-    }
-
-    const el = arrowMarker.getElement();
-    if(el){
-      el.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
-    }
-
-    lastPos=[...start];
     if(follow) map.setView(start,17);
     info.innerText="📍 GPS يعمل (حي)";
   },()=>alert("اسمح بالموقع"),{enableHighAccuracy:true});
@@ -154,8 +139,6 @@ function toggleFollow(){
   follow=!follow;
   info.innerText=follow?"🧭 تتبع مفعّل":"🧭 التتبع متوقف";
 }
-map.on("dragstart",()=>follow=false);
-map.on("zoomstart",()=>follow=false);
 
 /* ================= MODE ================= */
 function setMode(m){
@@ -166,62 +149,26 @@ function setMode(m){
   if(m==="car") carBtn.classList.add("active");
 }
 
-/* ================= DEST ================= */
-map.on("click",e=>{
-  end=[e.latlng.lat,e.latlng.lng];
-  if(endMarker) map.removeLayer(endMarker);
-  endMarker=L.marker(end).addTo(map);
-  info.innerText="📍 تم اختيار الوجهة";
+/* ================= SIDE CALC ================= */
+function getSide(userLat,userLng,targetLat,targetLng,heading){
+  const dx=targetLng-userLng;
+  const dy=targetLat-userLat;
+  const a=Math.atan2(dx,dy)*180/Math.PI;
+  const d=(a-heading+360)%360;
+  return d>180?"يسار":"يمين";
+}
+
+/* ================= OFFERS ================= */
+db.collection("offers").orderBy("createdAt","desc").onSnapshot(s=>{
+  s.docChanges().forEach(c=>{
+    if(c.type==="added"){
+      const o=c.doc.data();
+      const side=start?getSide(start[0],start[1],o.lat,o.lng,compassAngle):"";
+      L.marker([o.lat,o.lng]).addTo(map)
+       .bindPopup(`📢 ${o.title}<br>➡️ على ${side}`);
+    }
+  });
 });
-
-/* ================= ROUTE ================= */
-function startNav(){
-  if(!start||!end){alert("حدد موقعك والوجهة");return;}
-  const profile=mode==="car"?"driving":"foot";
-  fetch(`https://router.project-osrm.org/route/v1/${profile}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`)
-  .then(r=>r.json()).then(d=>{
-    if(routeLine) map.removeLayer(routeLine);
-    routeLine=L.geoJSON(d.routes[0].geometry,{
-      style:{color:"#1976d2",weight:6}
-    }).addTo(map);
-    info.innerText="▶️ الملاحة بدأت";
-  });
-}
-function cancelNav(){
-  if(routeLine) map.removeLayer(routeLine);
-  if(endMarker) map.removeLayer(endMarker);
-  routeLine=null;end=null;
-  info.innerText="❌ تم الإلغاء";
-}
-
-/* ================= OFFERS (محسّن) ================= */
-const offerMarkers={};
-
-function addOffer(){
-  if(!start){alert("شغّل GPS أولاً");return;}
-  const title=prompt("وصف العرض:");
-  if(!title)return;
-  db.collection("offers").add({
-    title,
-    lat:start[0],
-    lng:start[1],
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
-}
-
-db.collection("offers")
-  .orderBy("createdAt","desc")
-  .onSnapshot(s=>{
-    s.docChanges().forEach(c=>{
-      if(c.type==="added"){
-        if(offerMarkers[c.doc.id]) return;
-        const o=c.doc.data();
-        offerMarkers[c.doc.id]=L.marker([o.lat,o.lng])
-          .addTo(map)
-          .bindPopup(o.title);
-      }
-    });
-  });
 </script>
 
 </body>
