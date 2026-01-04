@@ -6,28 +6,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{margin:0;font-family:Arial;background:#ece5dd}
-.login,.chat{display:none;height:100vh}
-.login{display:flex;align-items:center;justify-content:center}
-.box{background:#fff;padding:20px;border-radius:10px;width:300px}
-.chat{display:flex}
-.sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
-.messages{flex:1;display:flex;flex-direction:column}
-.header{background:#075e54;color:#fff;padding:10px;text-align:center}
-.list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
-.list div:hover{background:#f0f0f0}
-.msgs{flex:1;padding:10px;overflow:auto}
-.msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%;position:relative}
-.me{background:#b2f2bb;margin-left:auto}
-.small{font-size:11px;color:#555;text-align:left}
-.msg button{
-  position:absolute;top:2px;left:2px;
-  background:red;border:none;color:#fff;font-size:10px;cursor:pointer
+body{
+  margin:0;
+  font-family:Arial;
+  background:#ece5dd;
 }
-.input{display:flex}
-input{flex:1;padding:10px}
-button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
-.logout{background:#d63031;margin-right:5px}
+
+/* إخفاء افتراضي */
+#loginBox,#chatBox{display:none;height:100vh}
+
+/* LOGIN */
+#loginBox{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.box{
+  background:#fff;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+  box-shadow:0 5px 15px rgba(0,0,0,.2);
+}
+
+/* CHAT */
+#chatBox{display:flex}
+.sidebar{
+  width:30%;
+  background:#fff;
+  border-left:1px solid #ccc;
+}
+.messages{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+.header{
+  background:#075e54;
+  color:#fff;
+  padding:10px;
+  text-align:center;
+}
+.msgs{
+  flex:1;
+  padding:10px;
+}
+input{width:100%;padding:10px;margin:5px 0}
+button{
+  padding:10px;
+  background:#25d366;
+  border:none;
+  color:#fff;
+  cursor:pointer;
+}
 </style>
 
 <!-- Firebase -->
@@ -44,6 +75,7 @@ const firebaseConfig = {
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -53,191 +85,65 @@ const db = firebase.firestore();
 <body>
 
 <!-- LOGIN -->
-<div class="login" id="loginBox">
+<div id="loginBox">
   <div class="box">
     <h3>تسجيل / دخول</h3>
     <input id="email" placeholder="email">
     <input id="pass" type="password" placeholder="password">
-    <input id="username" placeholder="اسم المستخدم (أول مرة فقط)">
-    <button onclick="doLogin()">دخول</button>
+    <input id="username" placeholder="اسم المستخدم (أول مرة)">
+    <button onclick="login()">دخول</button>
   </div>
 </div>
 
 <!-- CHAT -->
-<div class="chat" id="chatBox">
-
-<div class="sidebar">
-  <div class="header">
-    المستخدمين
-    <button class="logout" onclick="logout()">خروج</button>
+<div id="chatBox">
+  <div class="sidebar">
+    <div class="header">تم تسجيل الدخول ✅</div>
+    <button onclick="logout()">خروج</button>
   </div>
-
-  <div class="header">طلبات الصداقة</div>
-  <div class="list" id="requests"></div>
-
-  <div class="header">أصدقائي</div>
-  <div class="list" id="friends"></div>
-</div>
-
-<div class="messages">
-  <div class="header" id="chatHeader">
-    اختر صديق
-    <button class="logout" onclick="deleteChat()">حذف المحادثة</button>
+  <div class="messages">
+    <div class="header">الدردشة</div>
+    <div class="msgs">مرحباً 👋</div>
   </div>
-
-  <div class="msgs" id="msgs"></div>
-
-  <div class="input">
-    <input id="text" placeholder="اكتب رسالة">
-    <button onclick="send()">➤</button>
-  </div>
-</div>
 </div>
 
 <script>
-let currentChat=null;
+const loginBox = document.getElementById("loginBox");
+const chatBox  = document.getElementById("chatBox");
 
-// ================= AUTH =================
 auth.onAuthStateChanged(user=>{
   if(user){
-    db.collection("users").doc(user.uid).set({
-      email:user.email,
-      online:true
-    },{merge:true});
-
-    showChat();
-    loadRequests();
-    loadFriends();
+    loginBox.style.display="none";
+    chatBox.style.display="flex";
   }else{
-    showLogin();
+    chatBox.style.display="none";
+    loginBox.style.display="flex";
   }
 });
 
-window.addEventListener("beforeunload",()=>{
-  if(auth.currentUser)
-    db.collection("users").doc(auth.currentUser.uid).update({online:false});
-});
-
-async function doLogin(){
-  if(!email.value||!pass.value) return alert("املأ البيانات");
+async function login(){
+  if(!email.value||!pass.value){
+    alert("املأ البيانات");
+    return;
+  }
 
   try{
     await auth.signInWithEmailAndPassword(email.value,pass.value);
   }catch{
-    if(!username.value) return alert("اكتب اسم مستخدم");
-    const cred=await auth.createUserWithEmailAndPassword(email.value,pass.value);
+    if(!username.value){
+      alert("اكتب اسم مستخدم");
+      return;
+    }
+    const cred = await auth.createUserWithEmailAndPassword(email.value,pass.value);
     await db.collection("users").doc(cred.user.uid).set({
       username:username.value,
-      email:email.value,
-      online:true
+      email:email.value
     });
   }
 }
 
 function logout(){
-  db.collection("users").doc(auth.currentUser.uid).update({online:false});
   auth.signOut();
-}
-
-// ================= FRIEND REQUESTS =================
-function loadRequests(){
-  db.collection("requests")
-  .where("to","==",auth.currentUser.uid)
-  .onSnapshot(s=>{
-    requests.innerHTML="";
-    s.forEach(async d=>{
-      const u=await db.collection("users").doc(d.data().from).get();
-      const div=document.createElement("div");
-      div.innerHTML=`
-        ${u.data().username}
-        <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
-        <button onclick="reject('${d.id}')">✖</button>`;
-      requests.appendChild(div);
-    });
-  });
-}
-
-function accept(id,fid){
-  const chatId=[auth.currentUser.uid,fid].sort().join("_");
-  db.collection("friends").doc(chatId).set({users:[auth.currentUser.uid,fid]});
-  db.collection("requests").doc(id).delete();
-}
-function reject(id){
-  db.collection("requests").doc(id).delete();
-}
-
-// ================= FRIENDS =================
-function loadFriends(){
-  db.collection("friends")
-  .where("users","array-contains",auth.currentUser.uid)
-  .onSnapshot(async s=>{
-    friends.innerHTML="";
-    for(const d of s.docs){
-      const fid=d.data().users.find(u=>u!==auth.currentUser.uid);
-      const u=await db.collection("users").doc(fid).get();
-      const div=document.createElement("div");
-      div.innerHTML=`
-        ${u.data().username} ${u.data().online?"🟢":"⚪"}
-      `;
-      div.onclick=()=>openChat(d.id,u.data().username);
-      div.ondblclick=()=>db.collection("friends").doc(d.id).delete();
-      friends.appendChild(div);
-    }
-  });
-}
-
-// ================= CHAT =================
-function openChat(id,name){
-  currentChat=id;
-  chatHeader.firstChild.nodeValue=name;
-  listen();
-}
-
-function send(){
-  if(!text.value||!currentChat) return;
-  db.collection("chats").doc(currentChat)
-  .collection("messages").add({
-    text:text.value,
-    from:auth.currentUser.uid,
-    time:Date.now(),
-    status:"sent"
-  });
-  text.value="";
-}
-
-function listen(){
-  db.collection("chats").doc(currentChat)
-  .collection("messages").orderBy("time")
-  .onSnapshot(s=>{
-    msgs.innerHTML="";
-    s.forEach(d=>{
-      const m=document.createElement("div");
-      const mine=d.data().from===auth.currentUser.uid;
-      m.className="msg"+(mine?" me":"");
-      m.innerHTML=`
-        ${d.data().text}
-        ${mine?`<button onclick="deleteMsg('${d.id}')">✖</button>`:""}
-        <div class="small">${mine?(d.data().status==="seen"?"✔✔":"✔"):""}</div>
-      `;
-      if(!mine) d.ref.update({status:"seen"});
-      msgs.appendChild(m);
-    });
-  });
-}
-
-// حذف رسالة
-function deleteMsg(id){
-  db.collection("chats").doc(currentChat)
-  .collection("messages").doc(id).delete();
-}
-
-// حذف محادثة كاملة
-function deleteChat(){
-  if(!currentChat||!confirm("حذف المحادثة نهائياً؟")) return;
-  db.collection("chats").doc(currentChat)
-  .collection("messages").get().then(s=>{
-    s.forEach(d=>d.ref.delete());
-  });
 }
 </script>
 
