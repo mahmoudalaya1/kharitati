@@ -16,15 +16,12 @@ html,body{
   overflow:hidden;
   font-family:Arial
 }
-
-/* الخريطة */
 #map{
   position:fixed;
   inset:0;
-  z-index:1;
 }
 
-/* شريط البحث (لا يلتقط النقر) */
+/* Search */
 #searchBar{
   position:fixed;
   top:12px;
@@ -36,18 +33,16 @@ html,body{
   padding:12px 16px;
   border-radius:30px;
   box-shadow:0 4px 12px rgba(0,0,0,.3);
-  z-index:1000;
-  pointer-events:none;
+  z-index:1000
 }
 #searchBar input{
   width:100%;
   border:none;
   outline:none;
-  font-size:16px;
-  pointer-events:auto;
+  font-size:16px
 }
 
-/* الشريط السفلي (لا يلتقط النقر) */
+/* Bottom bar */
 #bottom{
   position:fixed;
   bottom:0;
@@ -57,19 +52,26 @@ html,body{
   border-radius:22px 22px 0 0;
   box-shadow:0 -4px 20px rgba(0,0,0,.3);
   padding:10px;
-  z-index:1000;
-  pointer-events:none;
-}
-#bottom .row button{
-  background:none;
-  border:none;
-  font-size:22px;
-  pointer-events:auto;
+  z-index:1000
 }
 #info{
   text-align:center;
   font-size:14px;
-  margin-bottom:6px;
+  margin-bottom:6px
+}
+#bottom .row{
+  display:flex;
+  justify-content:space-around
+}
+#bottom button{
+  background:none;
+  border:none;
+  font-size:22px;
+  cursor:pointer
+}
+.active{
+  color:#1976d2;
+  font-weight:bold;
 }
 </style>
 </head>
@@ -79,12 +81,15 @@ html,body{
 <div id="map"></div>
 
 <div id="searchBar">
-  <input placeholder="ابحث عن مكان (اختياري)">
+  <input placeholder="اضغط على الخريطة لتحديد وجهة">
 </div>
 
 <div id="bottom">
-  <div id="info">اضغط على الخريطة لتحديد الوجهة</div>
+  <div id="info">اختر وضع التنقل ثم اضغط ▶️</div>
   <div class="row">
+    <button id="carBtn" onclick="setMode('car')">🚗</button>
+    <button id="walkBtn" onclick="setMode('pedestrian')">🚶‍♂️</button>
+    <button id="bikeBtn" onclick="setMode('bicycle')">🚴</button>
     <button onclick="startNav()">▶️</button>
   </div>
 </div>
@@ -94,7 +99,7 @@ html,body{
 const HERE_API_KEY = "PUT_YOUR_API_KEY_HERE";
 
 /* ===== MAP ===== */
-const map = L.map("map").setView([36.2,37.13],13);
+const map = L.map("map").setView([41.05, 28.98], 14);
 
 L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -107,6 +112,9 @@ let end=null;
 let startMarker=null;
 let endMarker=null;
 let routeLine=null;
+let mode="pedestrian"; // الافتراضي مشي
+
+setMode("pedestrian");
 
 /* ===== GPS ===== */
 navigator.geolocation.getCurrentPosition(
@@ -115,60 +123,17 @@ navigator.geolocation.getCurrentPosition(
     startMarker=L.marker(start).addTo(map);
     map.setView(start,16);
   },
-  ()=>alert("لم يتم السماح بالموقع"),
+  ()=>alert("لم يتم السماح بتحديد الموقع"),
   {enableHighAccuracy:true}
 );
 
-/* ===== CLICK TO SET DESTINATION (مهم) ===== */
-map.on("click", e=>{
-  end=[e.latlng.lat, e.latlng.lng];
+/* ===== SET MODE ===== */
+function setMode(m){
+  mode=m;
+  document.getElementById("carBtn").classList.remove("active");
+  document.getElementById("walkBtn").classList.remove("active");
+  document.getElementById("bikeBtn").classList.remove("active");
 
-  if(endMarker) map.removeLayer(endMarker);
-  endMarker=L.marker(end,{title:"الوجهة"}).addTo(map);
-
-  document.getElementById("info").innerText =
-    "تم تحديد الوجهة ✔️ اضغط ▶️ لبدء الملاحة";
-});
-
-/* ===== ROUTING ===== */
-function startNav(){
-  if(!start || !end){
-    alert("حدد وجهة على الخريطة أولًا");
-    return;
-  }
-
-  fetch(
-    `https://router.hereapi.com/v8/routes?transportMode=car&origin=${start[0]},${start[1]}&destination=${end[0]},${end[1]}&return=polyline,summary&apiKey=${HERE_API_KEY}`
-  )
-  .then(r=>r.json())
-  .then(d=>{
-    if(routeLine) map.removeLayer(routeLine);
-    const s=d.routes[0].sections[0];
-    routeLine=L.polyline(decode(s.polyline),{
-      color:"#1976d2",weight:6
-    }).addTo(map);
-
-    document.getElementById("info").innerText =
-      `المتبقي ${(s.summary.length/1000).toFixed(1)} كم`;
-  });
-}
-
-/* ===== POLYLINE DECODE ===== */
-function decode(t){
-  let p=[],i=0,lat=0,lng=0;
-  while(i<t.length){
-    let b,s=0,r=0;
-    do{b=t.charCodeAt(i++)-63;r|=(b&31)<<s;s+=5}while(b>=32);
-    lat+=r&1?~(r>>1):(r>>1);
-    s=0;r=0;
-    do{b=t.charCodeAt(i++)-63;r|=(b&31)<<s;s+=5}while(b>=32);
-    lng+=r&1?~(r>>1):(r>>1);
-    p.push([lat/1e5,lng/1e5]);
-  }
-  return p;
-}
-</script>
-
-</body>
-</html>
-ر
+  if(m==="car") carBtn.classList.add("active");
+  if(m==="pedestrian") walkBtn.classList.add("active");
+  if(m==="bicycle
