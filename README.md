@@ -25,18 +25,18 @@ body { margin:0; padding:0; font-family:Arial }
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
 
 <script>
-// 🔑 ضع API KEY هنا
-mapboxgl.accessToken = "PUT_YOUR_MAPBOX_TOKEN_HERE";
+  // 🔑 ضع API KEY هنا
+  mapboxgl.accessToken = "pk.eyJ1IjoibWFobW91ZDEyMiIsImEiOiJjbWp6eGZuMmU2YjR2M2VzNWdvZG8zNnpzIn0.NHNOdln5ZCXjtDFya-Z0PQ";
 
-// إنشاء الخريطة
-const map = new mapboxgl.Map({
-  container: "map",
-  style: "mapbox://styles/mapbox/streets-v12",
-  center: [35.2433, 38.9637], // تركيا
-  zoom: 6
-});
-
-// أزرار التحكم
+  // إنشاء الخريطة
+  const map = new mapboxgl.Map({
+    container: "map",
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [35.2433, 38.9637], // تركيا
+    zoom: 6
+  });
+</script>
+// أزرار التحك
 map.addControl(new mapboxgl.NavigationControl());
 map.addControl(new mapboxgl.FullscreenControl());
 
