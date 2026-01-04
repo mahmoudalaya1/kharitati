@@ -2,173 +2,71 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>Kharitati Maps</title>
+<title>Mapbox Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Mapbox CSS -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.1/mapbox-gl-geocoder.css" rel="stylesheet" />
+<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" rel="stylesheet" />
 
 <style>
-html,body{margin:0;padding:0;height:100%;font-family:Arial}
-#map{height:100%}
-
-#locateBtn{
-  position:fixed;
-  top:20px;
-  right:20px;
-  z-index:2000;
-  background:white;
-  border:none;
-  border-radius:50%;
-  width:56px;
-  height:56px;
-  font-size:24px;
-  box-shadow:0 4px 12px rgba(0,0,0,.3);
-  cursor:pointer;
-}
-
-#bottom{
-  position:fixed;
-  bottom:0;left:0;width:100%;
-  background:white;
-  border-radius:22px 22px 0 0;
-  box-shadow:0 -4px 20px rgba(0,0,0,.3);
-  padding:10px;
-  z-index:1500;
-}
-#info{text-align:center;font-size:14px;margin-bottom:6px}
-.row{display:flex;justify-content:space-around}
-button{background:none;border:none;font-size:22px;cursor:pointer}
-.active{color:#1976d2;font-weight:bold}
-
-.arrow{
-  width:0;height:0;
-  border-left:10px solid transparent;
-  border-right:10px solid transparent;
-  border-bottom:22px solid #1976d2;
-}
+body { margin:0; padding:0; font-family:Arial }
+#map { position:absolute; top:0; bottom:0; width:100%; }
 </style>
 </head>
 
 <body>
-
-<button id="locateBtn" onclick="enableGPS()">📍</button>
 <div id="map"></div>
 
-<div id="bottom">
-  <div id="info">اضغط 📍 لتحديد موقعك</div>
-  <div class="row">
-    <button id="walkBtn" onclick="setMode('foot')">🚶‍♂️</button>
-    <button id="carBtn" onclick="setMode('car')">🚗</button>
-    <button onclick="toggleFollow()">🧭</button>
-    <button onclick="startNav()">▶️</button>
-    <button onclick="cancelNav()">❌</button>
-    <button onclick="addOffer()">➕</button>
-  </div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- Mapbox JS -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.1/mapbox-gl-geocoder.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
 
 <script>
-/* ================= GLOBAL ================= */
-let compassAngle = 0;
+  // 🔑 API KEY
+  mapboxgl.accessToken = "pk.eyJ1IjoibWFobW91ZDEyMiIsImEiOiJjbWp6eGZuMmU2YjR2M2VzNWdvZG8zNnpzIn0.NHNOdln5ZCXjtDFya-Z0PQ";
 
-/* ================= FIREBASE ================= */
-firebase.initializeApp({
-  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
-  authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.firebasestorage.app",
-  messagingSenderId: "296218682746",
-  appId: "1:296218682746:web:650a1161841ea510eea2c3"
-});
-firebase.auth().signInAnonymously();
-const db = firebase.firestore();
-
-/* ================= MAP ================= */
-const map = L.map("map",{zoomControl:false}).setView([41.05,28.98],14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
-
-/* ================= STATE ================= */
-let start=null,end=null;
-let arrowMarker=null,endMarker=null,routeLine=null;
-let follow=true;
-let mode="foot";
-let watchId=null;
-
-/* ================= COMPASS ================= */
-if (window.DeviceOrientationEvent) {
-  window.addEventListener("deviceorientation", e=>{
-    if(e.alpha!==null){
-      compassAngle = 360 - e.alpha;
-      if(arrowMarker){
-        const el = arrowMarker.getElement();
-        if(el) el.style.transform = `rotate(${compassAngle}deg)`;
-      }
-    }
-  },true);
-}
-
-/* ================= GPS ================= */
-function enableGPS(){
-  if(watchId) return;
-  watchId = navigator.geolocation.watchPosition(p=>{
-    start=[p.coords.latitude,p.coords.longitude];
-
-    if(!arrowMarker){
-      arrowMarker=L.marker(start,{
-        icon:L.divIcon({
-          html:'<div class="arrow"></div>',
-          iconSize:[22,22],
-          iconAnchor:[11,11]
-        })
-      }).addTo(map);
-    }else{
-      arrowMarker.setLatLng(start);
-    }
-
-    if(follow) map.setView(start,17);
-    info.innerText="📍 GPS يعمل (حي)";
-  },()=>alert("اسمح بالموقع"),{enableHighAccuracy:true});
-}
-
-/* ================= FOLLOW ================= */
-function toggleFollow(){
-  follow=!follow;
-  info.innerText=follow?"🧭 تتبع مفعّل":"🧭 التتبع متوقف";
-}
-
-/* ================= MODE ================= */
-function setMode(m){
-  mode=m;
-  walkBtn.classList.remove("active");
-  carBtn.classList.remove("active");
-  if(m==="foot") walkBtn.classList.add("active");
-  if(m==="car") carBtn.classList.add("active");
-}
-
-/* ================= SIDE CALC ================= */
-function getSide(userLat,userLng,targetLat,targetLng,heading){
-  const dx=targetLng-userLng;
-  const dy=targetLat-userLat;
-  const a=Math.atan2(dx,dy)*180/Math.PI;
-  const d=(a-heading+360)%360;
-  return d>180?"يسار":"يمين";
-}
-
-/* ================= OFFERS ================= */
-db.collection("offers").orderBy("createdAt","desc").onSnapshot(s=>{
-  s.docChanges().forEach(c=>{
-    if(c.type==="added"){
-      const o=c.doc.data();
-      const side=start?getSide(start[0],start[1],o.lat,o.lng,compassAngle):"";
-      L.marker([o.lat,o.lng]).addTo(map)
-       .bindPopup(`📢 ${o.title}<br>➡️ على ${side}`);
-    }
+  // إنشاء الخريطة
+  const map = new mapboxgl.Map({
+    container: "map",
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [35.2433, 38.9637], // تركيا
+    zoom: 6
   });
-});
+
+  // أزرار التحكم
+  map.addControl(new mapboxgl.NavigationControl());
+  map.addControl(new mapboxgl.FullscreenControl());
+
+  // تحديد الموقع GPS
+  map.addControl(
+    new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserHeading: true
+    })
+  );
+
+  // البحث
+  map.addControl(
+    new MapboxGeocoder({
+      accessToken: mapboxgl.accessToken,
+      mapboxgl: mapboxgl,
+      placeholder: "ابحث عن مكان"
+    })
+  );
+
+  // الملاحة (المسار)
+  map.addControl(
+    new MapboxDirections({
+      accessToken: mapboxgl.accessToken,
+      unit: "metric",
+      language: "ar"
+    }),
+    "top-left"
+  );
 </script>
 
 </body>
