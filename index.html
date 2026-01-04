@@ -14,16 +14,17 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
 .messages{flex:1;display:flex;flex-direction:column}
 .header{background:#075e54;color:#fff;padding:10px;text-align:center}
-.list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
+.list div{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
 .list div:hover{background:#f0f0f0}
 .msgs{flex:1;padding:10px;overflow:auto}
 .msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
 .input{display:flex}
 input{flex:1;padding:10px}
 button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
+.req button{margin:3px}
 </style>
 
-<!-- Firebase SDKs -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -40,7 +41,11 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const db = firebase.firestore();
+const db   = firebase.firestore();
+
+function generateUserCode(uid){
+  return uid.slice(0,6).toUpperCase();
+}
 </script>
 </head>
 
@@ -52,7 +57,7 @@ const db = firebase.firestore();
     <h3>تسجيل / دخول</h3>
     <input id="email" placeholder="email">
     <input id="pass" type="password" placeholder="password">
-    <input id="username" placeholder="اسم المستخدم (لأول مرة فقط)">
+    <input id="username" placeholder="اسم المستخدم (أول مرة فقط)">
     <button onclick="doLogin()">دخول</button>
   </div>
 </div>
@@ -60,98 +65,129 @@ const db = firebase.firestore();
 <!-- CHAT -->
 <div class="chat" id="chatBox">
 
-  <div class="sidebar">
-    <div class="header">كل المستخدمين</div>
-    <div class="list" id="allUsers"></div>
+<div class="sidebar">
 
-    <div class="header">أصدقائي</div>
-    <div class="list" id="friends"></div>
-  </div>
+  <div class="header">كودك</div>
+  <div class="list" id="myCode"></div>
 
-  <div class="messages">
-    <div class="header" id="chatHeader">اختر صديق</div>
-    <div class="msgs" id="msgs"></div>
-    <div class="input">
-      <input id="text" placeholder="اكتب رسالة">
-      <button onclick="send()">➤</button>
-    </div>
+  <div class="header">إضافة صديق بالكود</div>
+  <input id="friendCode" placeholder="مثال: A1B2C3">
+  <button onclick="sendFriendRequest()">إرسال طلب</button>
+
+  <div class="header">طلبات الصداقة</div>
+  <div class="list" id="requests"></div>
+
+  <div class="header">أصدقائي</div>
+  <div class="list" id="friends"></div>
+
+</div>
+
+<div class="messages">
+  <div class="header" id="chatHeader">اختر صديق</div>
+  <div class="msgs" id="msgs"></div>
+  <div class="input">
+    <input id="text" placeholder="اكتب رسالة">
+    <button onclick="send()">➤</button>
   </div>
+</div>
 
 </div>
 
 <script>
 let currentChat=null;
 
-// مراقبة تسجيل الدخول
 auth.onAuthStateChanged(user=>{
   if(user){
     saveUser();
     showChat();
-    loadAllUsers();   // ✅ هذا كان ناقص
+    loadMyCode();
     loadFriends();
+    loadRequests();
   }else{
     showLogin();
   }
 });
 
 function doLogin(){
-  if(!email.value || !pass.value){
-    alert("اكتب الإيميل وكلمة المرور");
-    return;
-  }
-
+  if(!email.value||!pass.value) return alert("املأ البيانات");
   auth.signInWithEmailAndPassword(email.value,pass.value)
   .catch(()=>{
-    if(!username.value){
-      alert("اكتب اسم مستخدم للتسجيل");
-      return;
-    }
+    if(!username.value) return alert("اسم المستخدم مطلوب");
     return auth.createUserWithEmailAndPassword(email.value,pass.value);
   });
 }
 
 function saveUser(){
   if(!username.value) return;
-  db.collection("users").doc(auth.currentUser.uid).set({
+  const uid=auth.currentUser.uid;
+  db.collection("users").doc(uid).set({
     username:username.value,
-    email:auth.currentUser.email
+    email:auth.currentUser.email,
+    code:generateUserCode(uid)
   },{merge:true});
 }
 
-function showLogin(){
-  loginBox.style.display="flex";
-  chatBox.style.display="none";
-}
-function showChat(){
-  loginBox.style.display="none";
-  chatBox.style.display="flex";
-}
+function showLogin(){loginBox.style.display="flex";chatBox.style.display="none";}
+function showChat(){loginBox.style.display="none";chatBox.style.display="flex";}
 
-// تحميل كل المستخدمين تلقائياً
-function loadAllUsers(){
-  db.collection("users").onSnapshot(snap=>{
-    allUsers.innerHTML="";
-    snap.forEach(d=>{
-      if(d.id===auth.currentUser.uid) return;
-      const div=document.createElement("div");
-      div.innerText="➕ "+d.data().username;
-      div.onclick=()=>addFriend(d.id);
-      allUsers.appendChild(div);
-    });
+function loadMyCode(){
+  db.collection("users").doc(auth.currentUser.uid).get()
+  .then(d=>{
+    myCode.innerText="🔑 "+d.data().code;
   });
 }
 
-// إضافة صديق
-function addFriend(friendId){
+/* ====== طلبات الصداقة ====== */
+async function sendFriendRequest(){
+  const code=friendCode.value.trim().toUpperCase();
+  if(!code) return;
+
+  const q=await db.collection("users").where("code","==",code).get();
+  if(q.empty) return alert("لا يوجد مستخدم");
+
+  const toId=q.docs[0].id;
+  const fromId=auth.currentUser.uid;
+  if(toId===fromId) return;
+
+  await db.collection("friend_requests").add({
+    from:fromId,to:toId,status:"pending",time:Date.now()
+  });
+
+  alert("تم إرسال الطلب");
+  friendCode.value="";
+}
+
+function loadRequests(){
+  db.collection("friend_requests")
+  .where("to","==",auth.currentUser.uid)
+  .where("status","==","pending")
+  .onSnapshot(async snap=>{
+    requests.innerHTML="";
+    for(const d of snap.docs){
+      const u=await db.collection("users").doc(d.data().from).get();
+      const div=document.createElement("div");
+      div.className="req";
+      div.innerHTML=`
+        ${u.data().username}
+        <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
+        <button onclick="reject('${d.id}')">✖</button>`;
+      requests.appendChild(div);
+    }
+  });
+}
+
+function accept(reqId,friendId){
   const myId=auth.currentUser.uid;
   const chatId=[myId,friendId].sort().join("_");
-
-  db.collection("friends").doc(chatId).set({
-    users:[myId,friendId]
-  });
+  db.collection("friends").doc(chatId).set({users:[myId,friendId]});
+  db.collection("friend_requests").doc(reqId).update({status:"accepted"});
 }
 
-// تحميل الأصدقاء
+function reject(reqId){
+  db.collection("friend_requests").doc(reqId).update({status:"rejected"});
+}
+
+/* ====== الأصدقاء والدردشة ====== */
 function loadFriends(){
   db.collection("friends")
   .where("users","array-contains",auth.currentUser.uid)
