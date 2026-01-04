@@ -19,7 +19,7 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .msgs{flex:1;padding:10px;overflow:auto}
 .msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%;position:relative}
 .me{background:#b2f2bb;margin-left:auto}
-.small{font-size:11px;color:#555}
+.small{font-size:11px;color:#555;text-align:left}
 .msg button{
   position:absolute;top:2px;left:2px;
   background:red;border:none;color:#fff;font-size:10px;cursor:pointer
@@ -27,7 +27,7 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .input{display:flex}
 input{flex:1;padding:10px}
 button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
-.logout{background:#d63031}
+.logout{background:#d63031;margin-right:5px}
 </style>
 
 <!-- Firebase -->
@@ -97,18 +97,20 @@ const db = firebase.firestore();
 <script>
 let currentChat=null;
 
-// AUTH
+// ================= AUTH =================
 auth.onAuthStateChanged(user=>{
   if(user){
     db.collection("users").doc(user.uid).set({
-      username: username.value || "مستخدم",
+      email:user.email,
       online:true
     },{merge:true});
 
     showChat();
     loadRequests();
     loadFriends();
-  }else showLogin();
+  }else{
+    showLogin();
+  }
 });
 
 window.addEventListener("beforeunload",()=>{
@@ -116,10 +118,20 @@ window.addEventListener("beforeunload",()=>{
     db.collection("users").doc(auth.currentUser.uid).update({online:false});
 });
 
-function doLogin(){
+async function doLogin(){
   if(!email.value||!pass.value) return alert("املأ البيانات");
-  auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
+
+  try{
+    await auth.signInWithEmailAndPassword(email.value,pass.value);
+  }catch{
+    if(!username.value) return alert("اكتب اسم مستخدم");
+    const cred=await auth.createUserWithEmailAndPassword(email.value,pass.value);
+    await db.collection("users").doc(cred.user.uid).set({
+      username:username.value,
+      email:email.value,
+      online:true
+    });
+  }
 }
 
 function logout(){
@@ -127,7 +139,7 @@ function logout(){
   auth.signOut();
 }
 
-// FRIEND REQUESTS
+// ================= FRIEND REQUESTS =================
 function loadRequests(){
   db.collection("requests")
   .where("to","==",auth.currentUser.uid)
@@ -150,9 +162,11 @@ function accept(id,fid){
   db.collection("friends").doc(chatId).set({users:[auth.currentUser.uid,fid]});
   db.collection("requests").doc(id).delete();
 }
-function reject(id){db.collection("requests").doc(id).delete();}
+function reject(id){
+  db.collection("requests").doc(id).delete();
+}
 
-// FRIENDS
+// ================= FRIENDS =================
 function loadFriends(){
   db.collection("friends")
   .where("users","array-contains",auth.currentUser.uid)
@@ -162,7 +176,9 @@ function loadFriends(){
       const fid=d.data().users.find(u=>u!==auth.currentUser.uid);
       const u=await db.collection("users").doc(fid).get();
       const div=document.createElement("div");
-      div.innerHTML=`${u.data().username} ${u.data().online?"🟢":"⚪"} ❌`;
+      div.innerHTML=`
+        ${u.data().username} ${u.data().online?"🟢":"⚪"}
+      `;
       div.onclick=()=>openChat(d.id,u.data().username);
       div.ondblclick=()=>db.collection("friends").doc(d.id).delete();
       friends.appendChild(div);
@@ -170,10 +186,10 @@ function loadFriends(){
   });
 }
 
-// CHAT
+// ================= CHAT =================
 function openChat(id,name){
   currentChat=id;
-  chatHeader.innerText=name;
+  chatHeader.firstChild.nodeValue=name;
   listen();
 }
 
@@ -196,26 +212,26 @@ function listen(){
     msgs.innerHTML="";
     s.forEach(d=>{
       const m=document.createElement("div");
-      m.className="msg"+(d.data().from===auth.currentUser.uid?" me":"");
+      const mine=d.data().from===auth.currentUser.uid;
+      m.className="msg"+(mine?" me":"");
       m.innerHTML=`
         ${d.data().text}
-        <button onclick="deleteMsg('${d.id}')">✖</button>
-        <div class="small">${d.data().status==="seen"?"✔✔":"✔"}</div>
+        ${mine?`<button onclick="deleteMsg('${d.id}')">✖</button>`:""}
+        <div class="small">${mine?(d.data().status==="seen"?"✔✔":"✔"):""}</div>
       `;
-      if(d.data().from!==auth.currentUser.uid)
-        d.ref.update({status:"seen"});
+      if(!mine) d.ref.update({status:"seen"});
       msgs.appendChild(m);
     });
   });
 }
 
-// حذف رسالة (عندك فقط)
+// حذف رسالة
 function deleteMsg(id){
   db.collection("chats").doc(currentChat)
   .collection("messages").doc(id).delete();
 }
 
-// حذف المحادثة كاملة (عند الطرفين)
+// حذف محادثة كاملة
 function deleteChat(){
   if(!currentChat||!confirm("حذف المحادثة نهائياً؟")) return;
   db.collection("chats").doc(currentChat)
