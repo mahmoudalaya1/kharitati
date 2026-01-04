@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>Kharitati GPS Pro</title>
+<title>Kharitati Live Navigation</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -30,12 +30,21 @@ html,body{margin:0;padding:0;height:100%}
 
 /* سهم الاتجاه */
 .arrow{
-  width:0;
-  height:0;
+  width:0;height:0;
   border-left:10px solid transparent;
   border-right:10px solid transparent;
   border-bottom:22px solid #1976d2;
   transform-origin:center;
+}
+
+/* عرض */
+.offer{
+  background:white;
+  padding:4px 6px;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.3);
+  font-size:12px;
+  white-space:nowrap;
 }
 </style>
 </head>
@@ -47,76 +56,100 @@ html,body{margin:0;padding:0;height:100%}
 
 <script>
 /* ================= MAP ================= */
-const map = L.map("map", {
-  zoomControl:true
-}).setView([41.05,28.98],15);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-  maxZoom:19
-}).addTo(map);
+const map = L.map("map").setView([41.05,28.98],15);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 
 /* ================= STATE ================= */
-let userMarker = null;
-let follow = true;
-let lastHeading = 0;
+let userMarker=null;
+let follow=true;
+let lastHeading=0;
+let destination=null;
+let routeLine=null;
 
 /* ================= ICON ================= */
-const arrowIcon = L.divIcon({
+const arrowIcon=L.divIcon({
   className:"",
   html:`<div class="arrow"></div>`,
   iconSize:[22,22],
   iconAnchor:[11,11]
 });
 
-/* ================= STOP FOLLOW ON MOVE ================= */
+/* ================= STOP FOLLOW ================= */
 map.on("dragstart",()=>follow=false);
 map.on("zoomstart",()=>follow=false);
 
 /* ================= GPS ================= */
-if(!navigator.geolocation){
-  alert("❌ المتصفح لا يدعم GPS");
-}else{
-  navigator.geolocation.watchPosition(
-    pos=>{
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const heading = pos.coords.heading ?? lastHeading;
+navigator.geolocation.watchPosition(
+ pos=>{
+  const lat=pos.coords.latitude;
+  const lng=pos.coords.longitude;
+  const heading=pos.coords.heading ?? lastHeading;
+  lastHeading=heading;
 
-      lastHeading = heading;
-
-      if(!userMarker){
-        userMarker = L.marker([lat,lng],{icon:arrowIcon}).addTo(map);
-        map.setView([lat,lng],17);
-      }else{
-        userMarker.setLatLng([lat,lng]);
-      }
-
-      // تدوير السهم
-      const el = userMarker.getElement();
-      if(el){
-        el.style.transform = `rotate(${heading}deg)`;
-      }
-
-      // Follow كامل
-      if(follow){
-        map.setView([lat,lng], map.getZoom(), {animate:true});
-      }
-    },
-    err=>{
-      alert("❌ لازم تسمح بالموقع من المتصفح");
-      console.error(err);
-    },
-    { enableHighAccuracy:true }
-  );
-}
-
-/* ================= BUTTON ================= */
-function centerOnMe(){
-  follow = true;
-  if(userMarker){
-    map.setView(userMarker.getLatLng(),17);
+  if(!userMarker){
+    userMarker=L.marker([lat,lng],{icon:arrowIcon}).addTo(map);
+    map.setView([lat,lng],17);
+  }else{
+    userMarker.setLatLng([lat,lng]);
   }
+
+  // تدوير السهم
+  const el=userMarker.getElement();
+  if(el) el.style.transform=`rotate(${heading}deg)`;
+
+  // Follow
+  if(follow) map.setView([lat,lng],map.getZoom(),{animate:true});
+
+  // تحديث المسار تلقائيًا
+  if(destination) updateRoute([lat,lng],destination);
+ },
+ err=>alert("❌ لازم تسمح بالموقع"),
+ {enableHighAccuracy:true}
+);
+
+/* ================= CENTER ================= */
+function centerOnMe(){
+ follow=true;
+ if(userMarker) map.setView(userMarker.getLatLng(),17);
 }
+
+/* ================= DESTINATION ================= */
+map.on("click",e=>{
+ destination=[e.latlng.lat,e.latlng.lng];
+ updateRoute(userMarker.getLatLng(),destination);
+});
+
+/* ================= LIVE ROUTING ================= */
+function updateRoute(start,end){
+ const url=`https://router.project-osrm.org/route/v1/foot/${start.lng},${start.lat};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+
+ fetch(url).then(r=>r.json()).then(d=>{
+  if(d.code!=="Ok") return;
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine=L.geoJSON(d.routes[0].geometry,{
+    style:{color:"#1976d2",weight:6}
+  }).addTo(map);
+ });
+}
+
+/* ================= OFFERS (يمين / يسار) ================= */
+const offers=[
+ {lat:41.051,lng:28.981,title:"بيع دكان",side:"right"},
+ {lat:41.049,lng:28.979,title:"تأجير محل",side:"left"},
+ {lat:41.052,lng:28.978,title:"بائع خضار",side:"front"}
+];
+
+function offerIcon(o){
+ const arrow=o.side==="right"?"➡️":o.side==="left"?"⬅️":"⬆️";
+ return L.divIcon({
+  className:"",
+  html:`<div class="offer">${arrow} ${o.title}</div>`
+ });
+}
+
+offers.forEach(o=>{
+ L.marker([o.lat,o.lng],{icon:offerIcon(o)}).addTo(map);
+});
 </script>
 
 </body>
