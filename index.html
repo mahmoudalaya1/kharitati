@@ -49,7 +49,6 @@ button{background:none;border:none;font-size:22px;cursor:pointer}
   border-left:10px solid transparent;
   border-right:10px solid transparent;
   border-bottom:22px solid #1976d2;
-  transform-origin:center;
 }
 </style>
 </head>
@@ -100,22 +99,22 @@ let follow=true;
 let mode="foot";
 let lastPos=null;
 let watchId=null;
+let heading=0;
 
-/* ================= GPS + ARROW (مُصحّح) ================= */
+/* ================= GPS + ARROW (محسّن) ================= */
 function enableGPS(){
   if(!navigator.geolocation){
     alert("المتصفح لا يدعم GPS");
     return;
   }
-
-  if(watchId) return; // منع التكرار
+  if(watchId) return;
 
   watchId = navigator.geolocation.watchPosition(p=>{
     start=[p.coords.latitude,p.coords.longitude];
 
     if(!arrowMarker){
       arrowMarker = L.marker(start,{
-        icon: L.divIcon({
+        icon:L.divIcon({
           className:"",
           html:'<div class="arrow"></div>',
           iconSize:[22,22],
@@ -126,18 +125,22 @@ function enableGPS(){
       arrowMarker.setLatLng(start);
     }
 
-    if(lastPos){
-      const angle = Math.atan2(
+    /* اتجاه أدق */
+    if(p.coords.heading !== null){
+      heading = p.coords.heading;
+    }else if(lastPos){
+      heading = Math.atan2(
         start[1]-lastPos[1],
         start[0]-lastPos[0]
       ) * 180 / Math.PI;
+    }
 
-      const el = arrowMarker.getElement();
-      if(el) el.style.transform = `rotate(${angle}deg)`;
+    const el = arrowMarker.getElement();
+    if(el){
+      el.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
     }
 
     lastPos=[...start];
-
     if(follow) map.setView(start,17);
     info.innerText="📍 GPS يعمل (حي)";
   },()=>alert("اسمح بالموقع"),{enableHighAccuracy:true});
@@ -175,7 +178,9 @@ function startNav(){
   fetch(`https://router.project-osrm.org/route/v1/${profile}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`)
   .then(r=>r.json()).then(d=>{
     if(routeLine) map.removeLayer(routeLine);
-    routeLine=L.geoJSON(d.routes[0].geometry,{style:{color:"#1976d2",weight:6}}).addTo(map);
+    routeLine=L.geoJSON(d.routes[0].geometry,{
+      style:{color:"#1976d2",weight:6}
+    }).addTo(map);
     info.innerText="▶️ الملاحة بدأت";
   });
 }
@@ -186,7 +191,9 @@ function cancelNav(){
   info.innerText="❌ تم الإلغاء";
 }
 
-/* ================= OFFERS ================= */
+/* ================= OFFERS (محسّن) ================= */
+const offerMarkers={};
+
 function addOffer(){
   if(!start){alert("شغّل GPS أولاً");return;}
   const title=prompt("وصف العرض:");
@@ -198,14 +205,20 @@ function addOffer(){
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 }
-db.collection("offers").onSnapshot(s=>{
-  s.docChanges().forEach(c=>{
-    if(c.type==="added"){
-      const o=c.doc.data();
-      L.marker([o.lat,o.lng]).addTo(map).bindPopup(o.title);
-    }
+
+db.collection("offers")
+  .orderBy("createdAt","desc")
+  .onSnapshot(s=>{
+    s.docChanges().forEach(c=>{
+      if(c.type==="added"){
+        if(offerMarkers[c.doc.id]) return;
+        const o=c.doc.data();
+        offerMarkers[c.doc.id]=L.marker([o.lat,o.lng])
+          .addTo(map)
+          .bindPopup(o.title);
+      }
+    });
   });
-});
 </script>
 
 </body>
