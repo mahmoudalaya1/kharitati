@@ -9,17 +9,17 @@
 body{margin:0;font-family:Arial;background:#ece5dd}
 .login,.chat{display:none;height:100vh}
 .login{display:flex;align-items:center;justify-content:center}
-.box{background:#fff;padding:20px;border-radius:10px;width:280px}
-.chat{display:flex;height:100vh}
-.sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
+.box{background:#fff;padding:20px;border-radius:10px;width:300px}
+.chat{display:flex}
+.sidebar{width:30%;background:#fff;border-left:1px solid #ccc}
 .messages{flex:1;display:flex;flex-direction:column}
-.header{background:#075e54;color:#fff;padding:10px}
+.header{background:#075e54;color:#fff;padding:10px;text-align:center}
 .list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
 .list div:hover{background:#f0f0f0}
 .msgs{flex:1;padding:10px;overflow:auto}
 .msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
 .input{display:flex}
-input{flex:1;padding:10px}
+input{flex:1;padding:10px;margin-bottom:5px}
 button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
 </style>
 
@@ -29,12 +29,12 @@ button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-// 🔥 Firebase CONFIG (تأكد أنه نفس Web App)
+// 🔥 Firebase config (من Web App)
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
   projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.appspot.com",
+  storageBucket: "kharitati-5cb37.firebasestorage.app",
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
@@ -51,24 +51,33 @@ const db   = firebase.firestore();
 <div class="login" id="loginBox">
   <div class="box">
     <h3>تسجيل / دخول</h3>
-    <input id="email" placeholder="email"><br><br>
-    <input id="pass" type="password" placeholder="password"><br><br>
-    <input id="username" placeholder="اسم المستخدم (لأول مرة فقط)"><br><br>
-    <button onclick="doLogin()">دخول / تسجيل</button>
+    <input id="email" placeholder="email">
+    <input id="pass" type="password" placeholder="password">
+    <input id="username" placeholder="اسم المستخدم (للتسجيل فقط)">
+    <button onclick="doLogin()">دخول</button>
   </div>
 </div>
 
 <!-- CHAT -->
 <div class="chat" id="chatBox">
 
+  <!-- SIDEBAR -->
   <div class="sidebar">
-    <div class="header">كل المستخدمين</div>
-    <div class="list" id="allUsers"></div>
+    <div class="header">الأصدقاء</div>
 
-    <div class="header">أصدقائي</div>
+    <!-- SEARCH -->
+    <div style="padding:10px">
+      <input id="searchName" placeholder="ابحث عن صديق">
+      <button onclick="searchUser()">بحث</button>
+    </div>
+
+    <div class="list" id="searchResults"></div>
+
+    <div class="header">قائمة أصدقائي</div>
     <div class="list" id="friends"></div>
   </div>
 
+  <!-- MESSAGES -->
   <div class="messages">
     <div class="header" id="chatHeader">اختر صديق</div>
     <div class="msgs" id="msgs"></div>
@@ -77,7 +86,6 @@ const db   = firebase.firestore();
       <button onclick="send()">➤</button>
     </div>
   </div>
-
 </div>
 
 <script>
@@ -88,7 +96,6 @@ auth.onAuthStateChanged(user=>{
   if(user){
     saveUser();
     showChat();
-    loadAllUsers();
     loadFriends();
   }else{
     showLogin();
@@ -105,7 +112,7 @@ function doLogin(){
   auth.signInWithEmailAndPassword(email.value, pass.value)
   .catch(()=>{
     if(!username.value){
-      alert("اكتب اسم المستخدم لإنشاء حساب");
+      alert("اكتب اسم مستخدم للتسجيل");
       return;
     }
     return auth.createUserWithEmailAndPassword(email.value, pass.value);
@@ -116,8 +123,8 @@ function doLogin(){
 function saveUser(){
   if(!username.value) return;
   db.collection("users").doc(auth.currentUser.uid).set({
-    email: auth.currentUser.email,
-    username: username.value
+    username: username.value,
+    email: auth.currentUser.email
   },{merge:true});
 }
 
@@ -131,29 +138,45 @@ function showChat(){
   chatBox.style.display="flex";
 }
 
-// ✅ تحميل كل المستخدمين تلقائيًا
-function loadAllUsers(){
-  db.collection("users").onSnapshot(snap=>{
-    allUsers.innerHTML="";
-    snap.forEach(d=>{
-      if(d.id === auth.currentUser.uid) return;
+// 🔍 البحث عن مستخدم
+async function searchUser(){
+  const name = searchName.value.trim();
+  searchResults.innerHTML="";
 
-      const div = document.createElement("div");
-      div.innerText = "➕ " + d.data().username;
-      div.onclick = ()=>addFriendById(d.id);
-      allUsers.appendChild(div);
-    });
+  if(!name){
+    alert("اكتب اسم");
+    return;
+  }
+
+  const q = await db.collection("users")
+    .where("username","==",name).get();
+
+  if(q.empty){
+    searchResults.innerHTML="<div>❌ لا يوجد مستخدم</div>";
+    return;
+  }
+
+  q.forEach(d=>{
+    if(d.id===auth.currentUser.uid) return;
+    const div=document.createElement("div");
+    div.innerText="➕ "+d.data().username;
+    div.onclick=()=>addFriendById(d.id);
+    searchResults.appendChild(div);
   });
 }
 
-// إضافة صديق بالضغط فقط
+// إضافة صديق
 async function addFriendById(friendId){
-  const myId = auth.currentUser.uid;
-  const chatId = [myId, friendId].sort().join("_");
+  const myId=auth.currentUser.uid;
+  const chatId=[myId,friendId].sort().join("_");
 
   await db.collection("friends").doc(chatId).set({
-    users:[myId, friendId]
+    users:[myId,friendId]
   });
+
+  alert("✅ تمت إضافة الصديق");
+  searchResults.innerHTML="";
+  searchName.value="";
 }
 
 // تحميل الأصدقاء
@@ -163,9 +186,8 @@ function loadFriends(){
   .onSnapshot(async snap=>{
     friends.innerHTML="";
     for(const d of snap.docs){
-      const fid = d.data().users.find(u=>u!==auth.currentUser.uid);
-      const u = await db.collection("users").doc(fid).get();
-
+      const fid=d.data().users.find(u=>u!==auth.currentUser.uid);
+      const u=await db.collection("users").doc(fid).get();
       const div=document.createElement("div");
       div.innerText=u.data().username;
       div.onclick=()=>openChat(d.id,u.data().username);
@@ -174,7 +196,7 @@ function loadFriends(){
   });
 }
 
-// فتح محادثة
+// فتح دردشة
 function openChat(id,name){
   currentChat=id;
   chatHeader.innerText=name;
@@ -185,11 +207,11 @@ function openChat(id,name){
 function send(){
   if(!text.value || !currentChat) return;
   db.collection("chats").doc(currentChat)
-    .collection("messages").add({
-      text:text.value,
-      user:auth.currentUser.uid,
-      time:Date.now()
-    });
+  .collection("messages").add({
+    text:text.value,
+    user:auth.currentUser.uid,
+    time:Date.now()
+  });
   text.value="";
 }
 
