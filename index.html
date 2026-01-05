@@ -6,25 +6,93 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{margin:0;font-family:Arial;background:#eae6df}
-.hidden{display:none}
-.login{height:100vh;display:flex;align-items:center;justify-content:center}
-.box{background:#fff;padding:20px;border-radius:10px;width:280px}
-input,button{width:100%;padding:10px;margin-top:8px}
-button{background:#25d366;color:#fff;border:none;cursor:pointer}
-.app{display:flex;height:100vh}
-.sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
-.chat{flex:1;display:flex;flex-direction:column}
-.header{background:#075e54;color:#fff;padding:10px}
-.user{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
-.user:hover{background:#f0f0f0}
-.msgs{flex:1;padding:10px;overflow:auto;background:#efeae2}
-.msg{background:#fff;margin:5px;padding:8px;border-radius:6px;max-width:70%}
-.me{background:#dcf8c6;margin-left:auto}
-.small{font-size:11px;color:#555;text-align:left}
+body{margin:0;font-family:Arial;background:#ece5dd}
+
+/* LOGIN */
+#loginBox{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#ece5dd;
+  z-index:1000;
+}
+.box{
+  background:#fff;
+  padding:20px;
+  border-radius:10px;
+  width:300px;
+  text-align:center;
+}
+.box input{
+  width:100%;
+  padding:10px;
+  margin:5px 0;
+}
+.box button{
+  width:100%;
+  padding:10px;
+  background:#2ecc71;
+  border:none;
+  color:#fff;
+  cursor:pointer;
+}
+
+/* CHAT */
+#chatBox{
+  display:none;
+  height:100vh;
+}
+.chat{
+  display:flex;
+  height:100%;
+}
+.sidebar{
+  width:30%;
+  background:#fff;
+  border-left:1px solid #ccc;
+  overflow:auto;
+}
+.messages{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+.header{
+  background:#075e54;
+  color:#fff;
+  padding:10px;
+  text-align:center;
+}
+.list div{
+  padding:10px;
+  border-bottom:1px solid #eee;
+  cursor:pointer;
+}
+.list div:hover{background:#f0f0f0}
+.msgs{
+  flex:1;
+  padding:10px;
+  overflow:auto;
+}
+.msg{
+  background:#dcf8c6;
+  margin:5px;
+  padding:8px;
+  border-radius:6px;
+  max-width:70%;
+}
+.me{margin-left:auto;background:#b2f2bb}
 .input{display:flex}
-.input input{flex:1}
-.logout{background:#d63031}
+.input input{flex:1;padding:10px}
+.input button{
+  padding:10px;
+  background:#25d366;
+  border:none;
+  color:#fff;
+  cursor:pointer;
+}
 </style>
 
 <!-- Firebase -->
@@ -37,10 +105,11 @@ const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
   projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.firebasestorage.app",
+  storageBucket: "kharitati-5cb37.appspot.com",
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -50,93 +119,93 @@ const db = firebase.firestore();
 <body>
 
 <!-- LOGIN -->
-<div class="login" id="loginBox">
+<div id="loginBox">
   <div class="box">
     <h3>تسجيل / دخول</h3>
     <input id="email" placeholder="Email">
     <input id="pass" type="password" placeholder="Password">
     <input id="username" placeholder="اسم المستخدم (أول مرة)">
-    <button onclick="login()">دخول</button>
+    <button onclick="doLogin()">دخول</button>
   </div>
 </div>
 
-<!-- APP -->
-<div class="app hidden" id="app">
+<!-- CHAT -->
+<div id="chatBox">
+  <div class="chat">
+    <div class="sidebar">
+      <div class="header">الأصدقاء</div>
+      <div class="list" id="friends"></div>
+    </div>
 
-<div class="sidebar">
-  <div class="header">
-    المستخدمين
-    <button class="logout" onclick="logout()">خروج</button>
+    <div class="messages">
+      <div class="header" id="chatHeader">اختر صديق</div>
+      <div class="msgs" id="msgs"></div>
+      <div class="input">
+        <input id="text" placeholder="اكتب رسالة">
+        <button onclick="send()">إرسال</button>
+      </div>
+    </div>
   </div>
-  <div id="users"></div>
-</div>
-
-<div class="chat">
-  <div class="header" id="chatHeader">اختر محادثة</div>
-  <div class="msgs" id="msgs"></div>
-  <div class="input">
-    <input id="text" placeholder="اكتب رسالة">
-    <button onclick="send()">➤</button>
-  </div>
-</div>
-
 </div>
 
 <script>
 let currentChat=null;
 
-// AUTH
+/* 🔑 AUTH STATE (الحل الحقيقي هنا) */
 auth.onAuthStateChanged(user=>{
   if(user){
-    loginBox.classList.add("hidden");
-    app.classList.remove("hidden");
-
-    db.collection("users").doc(user.uid).set({
-      username: username.value || "مستخدم",
-      online:true
-    },{merge:true});
-
-    loadUsers();
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("chatBox").style.display="block";
+    loadFriends();
   }else{
-    loginBox.classList.remove("hidden");
-    app.classList.add("hidden");
+    document.getElementById("loginBox").style.display="flex";
+    document.getElementById("chatBox").style.display="none";
   }
 });
 
-window.onbeforeunload=()=>{
-  if(auth.currentUser)
-    db.collection("users").doc(auth.currentUser.uid).update({online:false});
-};
+function doLogin(){
+  if(!email.value||!pass.value){
+    alert("اكتب الإيميل وكلمة المرور");
+    return;
+  }
 
-function login(){
-  if(!email.value||!pass.value) return alert("املأ البيانات");
   auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
+  .catch(err=>{
+    if(err.code==="auth/user-not-found"){
+      if(!username.value){
+        alert("اكتب اسم مستخدم");
+        return;
+      }
+      auth.createUserWithEmailAndPassword(email.value,pass.value)
+      .then(cred=>{
+        db.collection("users").doc(cred.user.uid).set({
+          username:username.value,
+          email:email.value
+        });
+      });
+    }else{
+      alert(err.message);
+    }
+  });
 }
 
-function logout(){
-  db.collection("users").doc(auth.currentUser.uid).update({online:false});
-  auth.signOut();
-}
-
-// USERS LIST
-function loadUsers(){
+/* FRIENDS */
+function loadFriends(){
   db.collection("users").onSnapshot(s=>{
-    users.innerHTML="";
+    friends.innerHTML="";
     s.forEach(d=>{
       if(d.id===auth.currentUser.uid) return;
       const div=document.createElement("div");
-      div.className="user";
-      div.innerHTML=`${d.data().username} ${d.data().online?"🟢":"⚪"}`;
+      div.innerText=d.data().username;
       div.onclick=()=>openChat(d.id,d.data().username);
-      users.appendChild(div);
+      friends.appendChild(div);
     });
   });
 }
 
-// CHAT
-function openChat(uid,name){
-  currentChat=[auth.currentUser.uid,uid].sort().join("_");
+/* CHAT */
+function openChat(fid,name){
+  currentChat=[auth.currentUser.uid,fid].sort().join("_");
   chatHeader.innerText=name;
   listen();
 }
@@ -147,8 +216,7 @@ function send(){
   .collection("messages").add({
     text:text.value,
     from:auth.currentUser.uid,
-    time:Date.now(),
-    seen:false
+    time:Date.now()
   });
   text.value="";
 }
@@ -159,16 +227,10 @@ function listen(){
   .onSnapshot(s=>{
     msgs.innerHTML="";
     s.forEach(d=>{
-      const data=d.data();
-      const div=document.createElement("div");
-      div.className="msg"+(data.from===auth.currentUser.uid?" me":"");
-      div.innerHTML=`
-        ${data.text}
-        <div class="small">${data.from===auth.currentUser.uid?(data.seen?"✔✔":"✔"):""}</div>
-      `;
-      if(data.from!==auth.currentUser.uid)
-        d.ref.update({seen:true});
-      msgs.appendChild(div);
+      const m=document.createElement("div");
+      m.className="msg"+(d.data().from===auth.currentUser.uid?" me":"");
+      m.innerText=d.data().text;
+      msgs.appendChild(m);
     });
   });
 }
