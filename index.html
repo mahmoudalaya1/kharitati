@@ -25,12 +25,15 @@ body{margin:0;font-family:Arial;background:#ece5dd}
 .me{background:#b2f2bb;margin-left:auto}
 .small{font-size:11px;color:#555}
 
+.typing{font-size:12px;color:#555;padding:5px}
+
 .input{display:flex}
 .input input{flex:1;padding:10px}
 .input button{padding:10px;background:#25d366;border:none;color:#fff}
 </style>
 
-<!-- Firebase -->
+<audio id="notif" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -52,30 +55,33 @@ const db=firebase.firestore();
 
 <body>
 
-<!-- LOGIN -->
 <div id="loginBox">
   <div class="box">
     <h3>تسجيل / دخول</h3>
     <input id="email" placeholder="Email">
     <input id="pass" type="password" placeholder="Password">
-    <input id="username" placeholder="اسم المستخدم (أول مرة فقط)">
+    <input id="username" placeholder="اسم المستخدم (أول مرة)">
     <button onclick="login()">دخول</button>
   </div>
 </div>
 
-<!-- CHAT -->
 <div id="chatBox">
   <div class="chat">
     <div class="sidebar">
       <div class="header">المستخدمين</div>
       <div class="list" id="users"></div>
+
+      <div class="header">طلبات الصداقة</div>
+      <div class="list" id="requests"></div>
     </div>
 
     <div class="messages">
       <div class="header" id="chatHeader">اختر صديق</div>
+      <div class="typing" id="typing"></div>
       <div class="msgs" id="msgs"></div>
       <div class="input">
-        <input id="text" placeholder="اكتب رسالة">
+        <input id="text" placeholder="اكتب رسالة" oninput="typingNow(true)">
+        <input type="file" id="file" accept="image/*">
         <button onclick="send()">إرسال</button>
       </div>
     </div>
@@ -83,47 +89,36 @@ const db=firebase.firestore();
 </div>
 
 <script>
-let currentChat=null;
+let currentChat=null, currentFriend=null;
 
-/* AUTH */
 auth.onAuthStateChanged(user=>{
   if(user){
     db.collection("users").doc(user.uid).set({
-      username:user.displayName||"مستخدم",
+      username:user.displayName||username.value||"مستخدم",
       online:true,
-      lastSeen:firebase.firestore.FieldValue.serverTimestamp()
+      lastSeen:firebase.firestore.FieldValue.serverTimestamp(),
+      blocked:[]
     },{merge:true});
-
     loginBox.style.display="none";
     chatBox.style.display="block";
-    loadUsers();
+    loadUsers(); loadRequests();
   }else{
     loginBox.style.display="flex";
     chatBox.style.display="none";
   }
 });
 
-/* OFFLINE */
 window.addEventListener("beforeunload",()=>{
-  if(auth.currentUser){
+  if(auth.currentUser)
     db.collection("users").doc(auth.currentUser.uid).update({
       online:false,
       lastSeen:firebase.firestore.FieldValue.serverTimestamp()
     });
-  }
 });
 
-/* LOGIN */
 function login(){
   auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(()=>{
-    auth.createUserWithEmailAndPassword(email.value,pass.value)
-    .then(c=>{
-      db.collection("users").doc(c.user.uid).set({
-        username:username.value||"مستخدم"
-      });
-    });
-  });
+  .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
 }
 
 /* USERS */
@@ -133,53 +128,92 @@ function loadUsers(){
     s.forEach(d=>{
       if(d.id===auth.currentUser.uid) return;
       const u=d.data();
-      let status=u.online?"🟢":"⚪";
-      let last=u.online?"":"<small>آخر ظهور: "+(u.lastSeen?u.lastSeen.toDate().toLocaleTimeString():"")+"</small>";
       const div=document.createElement("div");
-      div.innerHTML=`<b>${u.username}</b> ${status}<br>${last}`;
-      div.onclick=()=>openChat(d.id,u.username);
+      div.innerHTML=`${u.username} ${u.online?"🟢":"⚪"}`;
+      div.onclick=()=>sendRequest(d.id,u.username);
       users.appendChild(div);
     });
   });
 }
 
+/* FRIEND REQUESTS */
+function sendRequest(id,name){
+  db.collection("requests").add({
+    from:auth.currentUser.uid,
+    to:id
+  });
+}
+
+function loadRequests(){
+  db.collection("requests").where("to","==",auth.currentUser.uid)
+  .onSnapshot(s=>{
+    requests.innerHTML="";
+    s.forEach(async d=>{
+      const u=await db.collection("users").doc(d.data().from).get();
+      const div=document.createElement("div");
+      div.innerHTML=`
+        ${u.data().username}
+        <button onclick="accept('${d.data().from}','${d.id}')">✔</button>
+        <button onclick="reject('${d.id}')">✖</button>`;
+      requests.appendChild(div);
+    });
+  });
+}
+
+function accept(fid,id){
+  db.collection("friends").doc([auth.currentUser.uid,fid].sort().join("_"))
+  .set({users:[auth.currentUser.uid,fid]});
+  db.collection("requests").doc(id).delete();
+}
+
+function reject(id){db.collection("requests").doc(id).delete();}
+
 /* CHAT */
-function openChat(id,name){
-  currentChat=[auth.currentUser.uid,id].sort().join("_");
+function openChat(fid,name){
+  currentFriend=fid;
+  currentChat=[auth.currentUser.uid,fid].sort().join("_");
   chatHeader.innerText=name;
   listen();
 }
 
 function send(){
-  if(!text.value||!currentChat) return;
-  db.collection("chats").doc(currentChat)
-  .collection("messages").add({
-    text:text.value,
-    from:auth.currentUser.uid,
-    time:Date.now(),
-    seen:false
-  });
-  text.value="";
+  if(!currentChat||(!text.value&&!file.files[0])) return;
+  const msg={from:auth.currentUser.uid,time:Date.now(),seen:false};
+  if(text.value) msg.text=text.value;
+  if(file.files[0]) msg.image=URL.createObjectURL(file.files[0]);
+  db.collection("chats").doc(currentChat).collection("messages").add(msg);
+  notif.play();
+  text.value=""; file.value="";
+  typingNow(false);
 }
 
 function listen(){
-  db.collection("chats").doc(currentChat)
-  .collection("messages").orderBy("time")
-  .onSnapshot(s=>{
+  db.collection("chats").doc(currentChat).collection("messages")
+  .orderBy("time").onSnapshot(s=>{
     msgs.innerHTML="";
     s.forEach(d=>{
       const m=d.data();
       const div=document.createElement("div");
       div.className="msg"+(m.from===auth.currentUser.uid?" me":"");
       div.innerHTML=`
-        ${m.text}
-        <div class="small">${m.seen?"✔✔":"✔"}</div>
-      `;
-      if(m.from!==auth.currentUser.uid){
-        d.ref.update({seen:true});
-      }
+        ${m.text||""}
+        ${m.image?`<img src="${m.image}" width="150">`:""}
+        <div class="small">${m.seen?"✔✔":"✔"}</div>`;
+      if(m.from!==auth.currentUser.uid) d.ref.update({seen:true});
       msgs.appendChild(div);
     });
+  });
+}
+
+/* TYPING */
+function typingNow(v){
+  if(!currentChat) return;
+  db.collection("chats").doc(currentChat).set({
+    typing:v?auth.currentUser.uid:null
+  },{merge:true});
+
+  db.collection("chats").doc(currentChat).onSnapshot(d=>{
+    typing.innerText=d.data()?.typing&&d.data().typing!==auth.currentUser.uid?"✍️ يكتب الآن...":"";
   });
 }
 </script>
