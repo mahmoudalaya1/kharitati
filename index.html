@@ -2,43 +2,32 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>Chat Friends</title>
+<title>BS Chat</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body{margin:0;font-family:Arial;background:#ece5dd}
+#loginBox{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;padding:20px;border-radius:10px;width:300px;text-align:center}
+.box input,.box button{width:100%;padding:10px;margin:5px 0}
+.box button{background:#25d366;border:none;color:#fff}
 
-/* LOGIN */
-#loginBox{
-  position:fixed; inset:0;
-  display:flex; align-items:center; justify-content:center;
-  background:#ece5dd; z-index:1000;
-}
-.box{
-  background:#fff; padding:20px;
-  border-radius:10px; width:300px; text-align:center;
-}
-.box input{width:100%; padding:10px; margin:5px 0}
-.box button{
-  width:100%; padding:10px; margin-top:5px;
-  border:none; color:#fff; cursor:pointer;
-}
-.loginBtn{background:#2ecc71}
-.registerBtn{background:#3498db}
+#chatBox{display:none;height:100vh}
+.chat{display:flex;height:100%}
+.sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
+.header{background:#075e54;color:#fff;padding:10px;text-align:center}
+.list div{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+.list div:hover{background:#f1f1f1}
 
-/* CHAT */
-#chatBox{display:none; height:100vh}
-.chat{display:flex; height:100%}
-.sidebar{width:30%; background:#fff; border-left:1px solid #ccc}
-.messages{flex:1; display:flex; flex-direction:column}
-.header{background:#075e54; color:#fff; padding:10px; text-align:center}
-.list div{padding:10px; border-bottom:1px solid #eee; cursor:pointer}
-.msgs{flex:1; padding:10px; overflow:auto}
-.msg{background:#dcf8c6; margin:5px; padding:8px; border-radius:6px; max-width:70%}
-.me{margin-left:auto; background:#b2f2bb}
+.messages{flex:1;display:flex;flex-direction:column}
+.msgs{flex:1;padding:10px;overflow:auto}
+.msg{background:#dcf8c6;padding:8px;margin:5px;border-radius:6px;max-width:70%}
+.me{background:#b2f2bb;margin-left:auto}
+.small{font-size:11px;color:#555}
+
 .input{display:flex}
-.input input{flex:1; padding:10px}
-.input button{padding:10px; background:#25d366; border:none; color:#fff}
+.input input{flex:1;padding:10px}
+.input button{padding:10px;background:#25d366;border:none;color:#fff}
 </style>
 
 <!-- Firebase -->
@@ -55,10 +44,9 @@ const firebaseConfig = {
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
-
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth=firebase.auth();
+const db=firebase.firestore();
 </script>
 </head>
 
@@ -70,9 +58,8 @@ const db = firebase.firestore();
     <h3>تسجيل / دخول</h3>
     <input id="email" placeholder="Email">
     <input id="pass" type="password" placeholder="Password">
-    <input id="username" placeholder="اسم المستخدم (للتسجيل فقط)">
-    <button class="loginBtn" onclick="login()">تسجيل دخول</button>
-    <button class="registerBtn" onclick="register()">تسجيل جديد</button>
+    <input id="username" placeholder="اسم المستخدم (أول مرة فقط)">
+    <button onclick="login()">دخول</button>
   </div>
 </div>
 
@@ -81,8 +68,9 @@ const db = firebase.firestore();
   <div class="chat">
     <div class="sidebar">
       <div class="header">المستخدمين</div>
-      <div class="list" id="friends"></div>
+      <div class="list" id="users"></div>
     </div>
+
     <div class="messages">
       <div class="header" id="chatHeader">اختر صديق</div>
       <div class="msgs" id="msgs"></div>
@@ -97,9 +85,15 @@ const db = firebase.firestore();
 <script>
 let currentChat=null;
 
-/* AUTH STATE */
+/* AUTH */
 auth.onAuthStateChanged(user=>{
   if(user){
+    db.collection("users").doc(user.uid).set({
+      username:user.displayName||"مستخدم",
+      online:true,
+      lastSeen:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+
     loginBox.style.display="none";
     chatBox.style.display="block";
     loadUsers();
@@ -109,45 +103,49 @@ auth.onAuthStateChanged(user=>{
   }
 });
 
+/* OFFLINE */
+window.addEventListener("beforeunload",()=>{
+  if(auth.currentUser){
+    db.collection("users").doc(auth.currentUser.uid).update({
+      online:false,
+      lastSeen:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+});
+
 /* LOGIN */
 function login(){
   auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(err=>alert("خطأ دخول: "+err.message));
-}
-
-/* REGISTER */
-function register(){
-  if(!username.value){
-    alert("اكتب اسم المستخدم");
-    return;
-  }
-  auth.createUserWithEmailAndPassword(email.value,pass.value)
-  .then(cred=>{
-    db.collection("users").doc(cred.user.uid).set({
-      username:username.value,
-      email:email.value
+  .catch(()=>{
+    auth.createUserWithEmailAndPassword(email.value,pass.value)
+    .then(c=>{
+      db.collection("users").doc(c.user.uid).set({
+        username:username.value||"مستخدم"
+      });
     });
-  })
-  .catch(err=>alert("خطأ تسجيل: "+err.message));
+  });
 }
 
 /* USERS */
 function loadUsers(){
   db.collection("users").onSnapshot(s=>{
-    friends.innerHTML="";
+    users.innerHTML="";
     s.forEach(d=>{
       if(d.id===auth.currentUser.uid) return;
+      const u=d.data();
+      let status=u.online?"🟢":"⚪";
+      let last=u.online?"":"<small>آخر ظهور: "+(u.lastSeen?u.lastSeen.toDate().toLocaleTimeString():"")+"</small>";
       const div=document.createElement("div");
-      div.innerText=d.data().username;
-      div.onclick=()=>openChat(d.id,d.data().username);
-      friends.appendChild(div);
+      div.innerHTML=`<b>${u.username}</b> ${status}<br>${last}`;
+      div.onclick=()=>openChat(d.id,u.username);
+      users.appendChild(div);
     });
   });
 }
 
 /* CHAT */
-function openChat(fid,name){
-  currentChat=[auth.currentUser.uid,fid].sort().join("_");
+function openChat(id,name){
+  currentChat=[auth.currentUser.uid,id].sort().join("_");
   chatHeader.innerText=name;
   listen();
 }
@@ -158,7 +156,8 @@ function send(){
   .collection("messages").add({
     text:text.value,
     from:auth.currentUser.uid,
-    time:Date.now()
+    time:Date.now(),
+    seen:false
   });
   text.value="";
 }
@@ -169,10 +168,17 @@ function listen(){
   .onSnapshot(s=>{
     msgs.innerHTML="";
     s.forEach(d=>{
-      const m=document.createElement("div");
-      m.className="msg"+(d.data().from===auth.currentUser.uid?" me":"");
-      m.innerText=d.data().text;
-      msgs.appendChild(m);
+      const m=d.data();
+      const div=document.createElement("div");
+      div.className="msg"+(m.from===auth.currentUser.uid?" me":"");
+      div.innerHTML=`
+        ${m.text}
+        <div class="small">${m.seen?"✔✔":"✔"}</div>
+      `;
+      if(m.from!==auth.currentUser.uid){
+        d.ref.update({seen:true});
+      }
+      msgs.appendChild(div);
     });
   });
 }
