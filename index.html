@@ -2,220 +2,151 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>BS Chat</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔥 BS Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<style>
-body{margin:0;font-family:Arial;background:#ece5dd}
-#loginBox{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
-.box{background:#fff;padding:20px;border-radius:10px;width:300px;text-align:center}
-.box input,.box button{width:100%;padding:10px;margin:5px 0}
-.box button{background:#25d366;border:none;color:#fff}
-
-#chatBox{display:none;height:100vh}
-.chat{display:flex;height:100%}
-.sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
-.header{background:#075e54;color:#fff;padding:10px;text-align:center}
-.list div{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
-.list div:hover{background:#f1f1f1}
-
-.messages{flex:1;display:flex;flex-direction:column}
-.msgs{flex:1;padding:10px;overflow:auto}
-.msg{background:#dcf8c6;padding:8px;margin:5px;border-radius:6px;max-width:70%}
-.me{background:#b2f2bb;margin-left:auto}
-.small{font-size:11px;color:#555}
-
-.typing{font-size:12px;color:#555;padding:5px}
-
-.input{display:flex}
-.input input{flex:1;padding:10px}
-.input button{padding:10px;background:#25d366;border:none;color:#fff}
-</style>
-
-<audio id="notif" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
-
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
-  authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.appspot.com",
-  messagingSenderId: "296218682746",
-  appId: "1:296218682746:web:650a1161841ea510eea2c3"
-};
-firebase.initializeApp(firebaseConfig);
-const auth=firebase.auth();
-const db=firebase.firestore();
-</script>
+<style>
+body{margin:0;font-family:tahoma;background:#ece5dd}
+header{background:#075e54;color:#fff;padding:10px;text-align:center}
+#container{display:flex;height:90vh}
+#users{width:30%;background:#fff;overflow:auto;border-left:1px solid #ccc}
+#chat{width:70%;display:flex;flex-direction:column}
+.user{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+.user:hover{background:#f1f1f1}
+.msgs{flex:1;overflow:auto;padding:10px}
+.msg{margin:5px;max-width:70%;padding:8px;border-radius:6px}
+.me{background:#dcf8c6;margin-left:auto}
+.other{background:#fff}
+input,button{padding:8px}
+footer{display:flex}
+#typing{font-size:12px;color:gray;padding:5px}
+.online{color:green;font-size:10px}
+.offline{color:gray;font-size:10px}
+</style>
 </head>
 
 <body>
 
-<div id="loginBox">
-  <div class="box">
-    <h3>تسجيل / دخول</h3>
-    <input id="email" placeholder="Email">
-    <input id="pass" type="password" placeholder="Password">
-    <input id="username" placeholder="اسم المستخدم (أول مرة)">
-    <button onclick="login()">دخول</button>
-  </div>
-</div>
+<header>🔥 BS Chat</header>
 
-<div id="chatBox">
-  <div class="chat">
-    <div class="sidebar">
-      <div class="header">المستخدمين</div>
-      <div class="list" id="users"></div>
+<div id="container">
+  <div id="users"></div>
 
-      <div class="header">طلبات الصداقة</div>
-      <div class="list" id="requests"></div>
-    </div>
+  <div id="chat">
+    <div id="typing"></div>
+    <div class="msgs" id="messages"></div>
 
-    <div class="messages">
-      <div class="header" id="chatHeader">اختر صديق</div>
-      <div class="typing" id="typing"></div>
-      <div class="msgs" id="msgs"></div>
-      <div class="input">
-        <input id="text" placeholder="اكتب رسالة" oninput="typingNow(true)">
-        <input type="file" id="file" accept="image/*">
-        <button onclick="send()">إرسال</button>
-      </div>
-    </div>
+    <footer>
+      <input id="msg" placeholder="اكتب رسالة..." style="flex:1">
+      <input type="file" id="img">
+      <button onclick="sendMsg()">إرسال</button>
+    </footer>
   </div>
 </div>
 
 <script>
-let currentChat=null, currentFriend=null;
+// 🔥 Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
+  authDomain: "kharitati-5cb37.firebaseapp.com",
+  projectId: "kharitati-5cb37",
+  storageBucket: "kharitati-5cb37.firebasestorage.app",
+  messagingSenderId: "296218682746",
+  appId: "1:296218682746:web:e097a1279383dd02eea2c3"
+};
 
-auth.onAuthStateChanged(user=>{
-  if(user){
-    db.collection("users").doc(user.uid).set({
-      username:user.displayName||username.value||"مستخدم",
-      online:true,
-      lastSeen:firebase.firestore.FieldValue.serverTimestamp(),
-      blocked:[]
-    },{merge:true});
-    loginBox.style.display="none";
-    chatBox.style.display="block";
-    loadUsers(); loadRequests();
-  }else{
-    loginBox.style.display="flex";
-    chatBox.style.display="none";
-  }
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+let me, currentChat;
+
+// 🔐 تسجيل تلقائي (تجربة)
+auth.signInAnonymously().then(u=>{
+  me = u.user.uid;
+  db.collection("users").doc(me).set({
+    online:true,
+    lastSeen:firebase.firestore.FieldValue.serverTimestamp(),
+    id:me.slice(0,6)
+  },{merge:true});
+  loadUsers();
 });
 
-window.addEventListener("beforeunload",()=>{
-  if(auth.currentUser)
-    db.collection("users").doc(auth.currentUser.uid).update({
-      online:false,
-      lastSeen:firebase.firestore.FieldValue.serverTimestamp()
-    });
-});
+window.onbeforeunload=()=>{
+  if(me) db.collection("users").doc(me).update({
+    online:false,
+    lastSeen:firebase.firestore.FieldValue.serverTimestamp()
+  });
+};
 
-function login(){
-  auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
-}
-
-/* USERS */
+// 👥 تحميل المستخدمين
 function loadUsers(){
   db.collection("users").onSnapshot(s=>{
     users.innerHTML="";
     s.forEach(d=>{
-      if(d.id===auth.currentUser.uid) return;
-      const u=d.data();
-      const div=document.createElement("div");
-      div.innerHTML=`${u.username} ${u.online?"🟢":"⚪"}`;
-      div.onclick=()=>sendRequest(d.id,u.username);
-      users.appendChild(div);
+      if(d.id!==me){
+        users.innerHTML+=`
+          <div class="user" onclick="openChat('${d.id}')">
+            ${d.data().id}
+            <div class="${d.data().online?'online':'offline'}">
+              ${d.data().online?'🟢 Online':'⚪ Last Seen'}
+            </div>
+          </div>`;
+      }
     });
   });
 }
 
-/* FRIEND REQUESTS */
-function sendRequest(id,name){
-  db.collection("requests").add({
-    from:auth.currentUser.uid,
-    to:id
-  });
-}
-
-function loadRequests(){
-  db.collection("requests").where("to","==",auth.currentUser.uid)
-  .onSnapshot(s=>{
-    requests.innerHTML="";
-    s.forEach(async d=>{
-      const u=await db.collection("users").doc(d.data().from).get();
-      const div=document.createElement("div");
-      div.innerHTML=`
-        ${u.data().username}
-        <button onclick="accept('${d.data().from}','${d.id}')">✔</button>
-        <button onclick="reject('${d.id}')">✖</button>`;
-      requests.appendChild(div);
+// 💬 فتح محادثة
+function openChat(id){
+  currentChat=[me,id].sort().join("_");
+  messages.innerHTML="";
+  db.collection("chats").doc(currentChat)
+    .collection("msgs")
+    .orderBy("t")
+    .onSnapshot(s=>{
+      messages.innerHTML="";
+      s.forEach(m=>{
+        let d=m.data();
+        messages.innerHTML+=`
+          <div class="msg ${d.u===me?'me':'other'}">
+            ${d.text||''}
+            ${d.img?`<img src="${d.img}" width="150">`:''}
+          </div>`;
+      });
     });
-  });
 }
 
-function accept(fid,id){
-  db.collection("friends").doc([auth.currentUser.uid,fid].sort().join("_"))
-  .set({users:[auth.currentUser.uid,fid]});
-  db.collection("requests").doc(id).delete();
-}
-
-function reject(id){db.collection("requests").doc(id).delete();}
-
-/* CHAT */
-function openChat(fid,name){
-  currentFriend=fid;
-  currentChat=[auth.currentUser.uid,fid].sort().join("_");
-  chatHeader.innerText=name;
-  listen();
-}
-
-function send(){
-  if(!currentChat||(!text.value&&!file.files[0])) return;
-  const msg={from:auth.currentUser.uid,time:Date.now(),seen:false};
-  if(text.value) msg.text=text.value;
-  if(file.files[0]) msg.image=URL.createObjectURL(file.files[0]);
-  db.collection("chats").doc(currentChat).collection("messages").add(msg);
-  notif.play();
-  text.value=""; file.value="";
-  typingNow(false);
-}
-
-function listen(){
-  db.collection("chats").doc(currentChat).collection("messages")
-  .orderBy("time").onSnapshot(s=>{
-    msgs.innerHTML="";
-    s.forEach(d=>{
-      const m=d.data();
-      const div=document.createElement("div");
-      div.className="msg"+(m.from===auth.currentUser.uid?" me":"");
-      div.innerHTML=`
-        ${m.text||""}
-        ${m.image?`<img src="${m.image}" width="150">`:""}
-        <div class="small">${m.seen?"✔✔":"✔"}</div>`;
-      if(m.from!==auth.currentUser.uid) d.ref.update({seen:true});
-      msgs.appendChild(div);
-    });
-  });
-}
-
-/* TYPING */
-function typingNow(v){
+// ✍️ إرسال رسالة
+function sendMsg(){
+  let text=msg.value;
   if(!currentChat) return;
-  db.collection("chats").doc(currentChat).set({
-    typing:v?auth.currentUser.uid:null
-  },{merge:true});
-
-  db.collection("chats").doc(currentChat).onSnapshot(d=>{
-    typing.innerText=d.data()?.typing&&d.data().typing!==auth.currentUser.uid?"✍️ يكتب الآن...":"";
-  });
+  msg.value="";
+  db.collection("chats").doc(currentChat)
+    .collection("msgs")
+    .add({text,u:me,t:Date.now()});
 }
+
+// 📎 رفع صورة
+img.onchange=()=>{
+  if(!currentChat) return;
+  let f=img.files[0];
+  let ref=storage.ref("imgs/"+Date.now()+f.name);
+  ref.put(f).then(()=>{
+    ref.getDownloadURL().then(url=>{
+      db.collection("chats").doc(currentChat)
+        .collection("msgs")
+        .add({img:url,u:me,t:Date.now()});
+    });
+  });
+};
 </script>
 
 </body>
