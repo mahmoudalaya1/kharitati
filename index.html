@@ -6,23 +6,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{margin:0;font-family:Arial;background:#ece5dd}
-.login,.chat{display:none;height:100vh}
-.login{display:flex;align-items:center;justify-content:center}
-.box{background:#fff;padding:20px;border-radius:10px;width:300px}
-.chat{display:flex}
+body{margin:0;font-family:Arial;background:#eae6df}
+.hidden{display:none}
+.login{height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;padding:20px;border-radius:10px;width:280px}
+input,button{width:100%;padding:10px;margin-top:8px}
+button{background:#25d366;color:#fff;border:none;cursor:pointer}
+.app{display:flex;height:100vh}
 .sidebar{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
-.messages{flex:1;display:flex;flex-direction:column}
-.header{background:#075e54;color:#fff;padding:10px;text-align:center}
-.list div{padding:10px;cursor:pointer;border-bottom:1px solid #eee}
-.list div:hover{background:#f0f0f0}
-.msgs{flex:1;padding:10px;overflow:auto}
-.msg{background:#dcf8c6;margin:5px;padding:8px;border-radius:6px;max-width:70%}
-.me{background:#b2f2bb;margin-left:auto}
+.chat{flex:1;display:flex;flex-direction:column}
+.header{background:#075e54;color:#fff;padding:10px}
+.user{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+.user:hover{background:#f0f0f0}
+.msgs{flex:1;padding:10px;overflow:auto;background:#efeae2}
+.msg{background:#fff;margin:5px;padding:8px;border-radius:6px;max-width:70%}
+.me{background:#dcf8c6;margin-left:auto}
+.small{font-size:11px;color:#555;text-align:left}
 .input{display:flex}
-input{flex:1;padding:10px}
-button{padding:10px;background:#25d366;border:none;color:#fff;cursor:pointer}
-.small{font-size:11px;color:#555}
+.input input{flex:1}
+.logout{background:#d63031}
 </style>
 
 <!-- Firebase -->
@@ -39,7 +41,6 @@ const firebaseConfig = {
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:650a1161841ea510eea2c3"
 };
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -52,35 +53,33 @@ const db = firebase.firestore();
 <div class="login" id="loginBox">
   <div class="box">
     <h3>تسجيل / دخول</h3>
-    <input id="email" placeholder="email">
-    <input id="pass" type="password" placeholder="password">
-    <input id="username" placeholder="اسم المستخدم (أول مرة فقط)">
-    <button onclick="doLogin()">دخول</button>
+    <input id="email" placeholder="Email">
+    <input id="pass" type="password" placeholder="Password">
+    <input id="username" placeholder="اسم المستخدم (أول مرة)">
+    <button onclick="login()">دخول</button>
   </div>
 </div>
 
-<!-- CHAT -->
-<div class="chat" id="chatBox">
+<!-- APP -->
+<div class="app hidden" id="app">
 
-  <div class="sidebar">
-    <div class="header">كل المستخدمين</div>
-    <div class="list" id="allUsers"></div>
-
-    <div class="header">طلبات الصداقة</div>
-    <div class="list" id="requests"></div>
-
-    <div class="header">أصدقائي</div>
-    <div class="list" id="friends"></div>
+<div class="sidebar">
+  <div class="header">
+    المستخدمين
+    <button class="logout" onclick="logout()">خروج</button>
   </div>
+  <div id="users"></div>
+</div>
 
-  <div class="messages">
-    <div class="header" id="chatHeader">اختر صديق</div>
-    <div class="msgs" id="msgs"></div>
-    <div class="input">
-      <input id="text" placeholder="اكتب رسالة">
-      <button onclick="send()">➤</button>
-    </div>
+<div class="chat">
+  <div class="header" id="chatHeader">اختر محادثة</div>
+  <div class="msgs" id="msgs"></div>
+  <div class="input">
+    <input id="text" placeholder="اكتب رسالة">
+    <button onclick="send()">➤</button>
   </div>
+</div>
+
 </div>
 
 <script>
@@ -89,120 +88,55 @@ let currentChat=null;
 // AUTH
 auth.onAuthStateChanged(user=>{
   if(user){
+    loginBox.classList.add("hidden");
+    app.classList.remove("hidden");
+
     db.collection("users").doc(user.uid).set({
-      email:user.email,
       username: username.value || "مستخدم",
       online:true
     },{merge:true});
 
-    showChat();
     loadUsers();
-    loadRequests();
-    loadFriends();
-  }else showLogin();
-});
-
-window.addEventListener("beforeunload",()=>{
-  if(auth.currentUser){
-    db.collection("users").doc(auth.currentUser.uid)
-    .update({online:false});
+  }else{
+    loginBox.classList.remove("hidden");
+    app.classList.add("hidden");
   }
 });
 
-function doLogin(){
+window.onbeforeunload=()=>{
+  if(auth.currentUser)
+    db.collection("users").doc(auth.currentUser.uid).update({online:false});
+};
+
+function login(){
   if(!email.value||!pass.value) return alert("املأ البيانات");
   auth.signInWithEmailAndPassword(email.value,pass.value)
   .catch(()=>auth.createUserWithEmailAndPassword(email.value,pass.value));
 }
 
-function showLogin(){
-  loginBox.style.display="flex";
-  chatBox.style.display="none";
-}
-function showChat(){
-  loginBox.style.display="none";
-  chatBox.style.display="flex";
+function logout(){
+  db.collection("users").doc(auth.currentUser.uid).update({online:false});
+  auth.signOut();
 }
 
-// USERS
+// USERS LIST
 function loadUsers(){
   db.collection("users").onSnapshot(s=>{
-    allUsers.innerHTML="";
+    users.innerHTML="";
     s.forEach(d=>{
       if(d.id===auth.currentUser.uid) return;
       const div=document.createElement("div");
-      div.innerHTML=`➕ ${d.data().username}`;
-      div.onclick=()=>sendRequest(d.id);
-      allUsers.appendChild(div);
+      div.className="user";
+      div.innerHTML=`${d.data().username} ${d.data().online?"🟢":"⚪"}`;
+      div.onclick=()=>openChat(d.id,d.data().username);
+      users.appendChild(div);
     });
   });
-}
-
-// FRIEND REQUEST
-function sendRequest(to){
-  db.collection("requests").add({
-    from:auth.currentUser.uid,
-    to
-  });
-}
-
-// LOAD REQUESTS
-function loadRequests(){
-  db.collection("requests")
-  .where("to","==",auth.currentUser.uid)
-  .onSnapshot(s=>{
-    requests.innerHTML="";
-    s.forEach(async d=>{
-      const u=await db.collection("users").doc(d.data().from).get();
-      const div=document.createElement("div");
-      div.innerHTML=`
-      ${u.data().username}
-      <button onclick="accept('${d.id}','${d.data().from}')">✔</button>
-      <button onclick="reject('${d.id}')">✖</button>`;
-      requests.appendChild(div);
-    });
-  });
-}
-
-function accept(reqId,friendId){
-  const chatId=[auth.currentUser.uid,friendId].sort().join("_");
-  db.collection("friends").doc(chatId).set({
-    users:[auth.currentUser.uid,friendId]
-  });
-  db.collection("requests").doc(reqId).delete();
-}
-
-function reject(id){
-  db.collection("requests").doc(id).delete();
-}
-
-// FRIENDS
-function loadFriends(){
-  db.collection("friends")
-  .where("users","array-contains",auth.currentUser.uid)
-  .onSnapshot(async s=>{
-    friends.innerHTML="";
-    for(const d of s.docs){
-      const fid=d.data().users.find(u=>u!==auth.currentUser.uid);
-      const u=await db.collection("users").doc(fid).get();
-      const div=document.createElement("div");
-      div.innerHTML=`
-      ${u.data().username} ${u.data().online?"🟢":"⚪"}
-      <button onclick="removeFriend('${d.id}')">❌</button>`;
-      div.onclick=()=>openChat(d.id,u.data().username);
-      friends.appendChild(div);
-    }
-  });
-}
-
-function removeFriend(id){
-  if(confirm("حذف الصديق؟"))
-    db.collection("friends").doc(id).delete();
 }
 
 // CHAT
-function openChat(id,name){
-  currentChat=id;
+function openChat(uid,name){
+  currentChat=[auth.currentUser.uid,uid].sort().join("_");
   chatHeader.innerText=name;
   listen();
 }
@@ -214,7 +148,7 @@ function send(){
     text:text.value,
     from:auth.currentUser.uid,
     time:Date.now(),
-    status:"sent"
+    seen:false
   });
   text.value="";
 }
@@ -225,13 +159,16 @@ function listen(){
   .onSnapshot(s=>{
     msgs.innerHTML="";
     s.forEach(d=>{
-      const m=document.createElement("div");
-      m.className="msg"+(d.data().from===auth.currentUser.uid?" me":"");
-      m.innerHTML=d.data().text+
-      `<div class="small">${d.data().status==="seen"?"✔✔":"✔"}</div>`;
-      if(d.data().from!==auth.currentUser.uid)
-        d.ref.update({status:"seen"});
-      msgs.appendChild(m);
+      const data=d.data();
+      const div=document.createElement("div");
+      div.className="msg"+(data.from===auth.currentUser.uid?" me":"");
+      div.innerHTML=`
+        ${data.text}
+        <div class="small">${data.from===auth.currentUser.uid?(data.seen?"✔✔":"✔"):""}</div>
+      `;
+      if(data.from!==auth.currentUser.uid)
+        d.ref.update({seen:true});
+      msgs.appendChild(div);
     });
   });
 }
