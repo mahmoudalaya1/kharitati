@@ -124,7 +124,7 @@ const db = firebase.firestore();
     <h3>تسجيل / دخول</h3>
     <input id="email" placeholder="Email">
     <input id="pass" type="password" placeholder="Password">
-    <input id="username" placeholder="اسم المستخدم (أول مرة)">
+    <input id="username" placeholder="اسم المستخدم (أول مرة فقط)">
     <button onclick="doLogin()">دخول</button>
   </div>
 </div>
@@ -133,7 +133,7 @@ const db = firebase.firestore();
 <div id="chatBox">
   <div class="chat">
     <div class="sidebar">
-      <div class="header">الأصدقاء</div>
+      <div class="header">المستخدمون</div>
       <div class="list" id="friends"></div>
     </div>
 
@@ -149,52 +149,58 @@ const db = firebase.firestore();
 </div>
 
 <script>
-let currentChat=null;
+let currentChat = null;
 
-/* 🔑 AUTH STATE (الحل الحقيقي هنا) */
+/* 🔐 AUTH STATE */
 auth.onAuthStateChanged(user=>{
   if(user){
-    document.getElementById("loginBox").style.display="none";
-    document.getElementById("chatBox").style.display="block";
-    loadFriends();
+    loginBox.style.display="none";
+    chatBox.style.display="block";
+    loadUsers();
   }else{
-    document.getElementById("loginBox").style.display="flex";
-    document.getElementById("chatBox").style.display="none";
+    loginBox.style.display="flex";
+    chatBox.style.display="none";
   }
 });
 
+/* LOGIN / REGISTER */
 function doLogin(){
-  if(!email.value||!pass.value){
+  if(!email.value || !pass.value){
     alert("اكتب الإيميل وكلمة المرور");
     return;
   }
 
-  auth.signInWithEmailAndPassword(email.value,pass.value)
+  auth.signInWithEmailAndPassword(email.value, pass.value)
   .catch(err=>{
-    if(err.code==="auth/user-not-found"){
+    if(err.code === "auth/user-not-found"){
       if(!username.value){
-        alert("اكتب اسم مستخدم");
+        alert("اكتب اسم مستخدم لإنشاء حساب");
         return;
       }
-      auth.createUserWithEmailAndPassword(email.value,pass.value)
+
+      auth.createUserWithEmailAndPassword(email.value, pass.value)
       .then(cred=>{
-        db.collection("users").doc(cred.user.uid).set({
-          username:username.value,
-          email:email.value
+        return db.collection("users").doc(cred.user.uid).set({
+          username: username.value,
+          email: email.value
         });
-      });
+      })
+      .catch(e=>alert(e.message));
+
+    }else if(err.code === "auth/wrong-password"){
+      alert("❌ كلمة المرور غير صحيحة");
     }else{
       alert(err.message);
     }
   });
 }
 
-/* FRIENDS */
-function loadFriends(){
+/* LOAD USERS */
+function loadUsers(){
   db.collection("users").onSnapshot(s=>{
     friends.innerHTML="";
     s.forEach(d=>{
-      if(d.id===auth.currentUser.uid) return;
+      if(d.id === auth.currentUser.uid) return;
       const div=document.createElement("div");
       div.innerText=d.data().username;
       div.onclick=()=>openChat(d.id,d.data().username);
@@ -211,7 +217,7 @@ function openChat(fid,name){
 }
 
 function send(){
-  if(!text.value||!currentChat) return;
+  if(!text.value || !currentChat) return;
   db.collection("chats").doc(currentChat)
   .collection("messages").add({
     text:text.value,
