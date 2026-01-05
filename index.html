@@ -1,196 +1,193 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>BS Chat 🔥</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
-<style>
-body{margin:0;font-family:Arial;background:#ece5dd}
-.hidden{display:none}
-header{background:#075e54;color:#fff;padding:10px;text-align:center;font-weight:bold}
-#app{display:flex;height:100vh}
-#users{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
-#chat{flex:1;display:flex;flex-direction:column}
-.user{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
-.user:hover{background:#f5f5f5}
-.msgs{flex:1;overflow:auto;padding:10px}
-.msg{max-width:70%;margin:5px;padding:8px;border-radius:7px}
-.me{background:#dcf8c6;margin-left:auto}
-.other{background:#fff}
-.footer{display:flex;gap:5px;padding:5px;background:#f0f0f0}
-.footer input{flex:1;padding:8px}
-.footer button{padding:8px}
-small{font-size:11px;color:#666}
-.online{color:green}
-.offline{color:gray}
-</style>
+class ChatScreen extends StatefulWidget {
+  final String receiverId;
+  final String receiverName;
+  final String chatId;
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  ChatScreen({required this.receiverId, required this.receiverName, required this.chatId});
 
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
-  authDomain: "kharitati-5cb37.firebaseapp.com",
-  projectId: "kharitati-5cb37",
-  storageBucket: "kharitati-5cb37.firebasestorage.app",
-  messagingSenderId: "296218682746",
-  appId: "1:296218682746:web:e097a1279383dd02eea2c3"
-};
-firebase.initializeApp(firebaseConfig);
+  @override
+  _ChatScreenState createState() => _ChatScreenState();
+}
 
-const auth=firebase.auth();
-const db=firebase.firestore();
-const storage=firebase.storage();
-</script>
-</head>
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-<body>
-
-<!-- LOGIN -->
-<div id="login">
-  <header>BS Chat 🔥</header>
-  <div style="padding:20px">
-    <input id="email" placeholder="Email"><br><br>
-    <input id="pass" type="password" placeholder="Password"><br><br>
-    <input id="username" placeholder="اسم المستخدم (أول مرة)"><br><br>
-    <button onclick="login()">دخول</button>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app" class="hidden">
-  <div id="users"></div>
-  <div id="chat">
-    <header id="chatHeader">اختر صديق</header>
-    <div class="msgs" id="msgs"></div>
-    <div class="footer">
-      <input id="text" placeholder="اكتب رسالة…">
-      <input type="file" id="file">
-      <button onclick="send()">إرسال</button>
-    </div>
-  </div>
-</div>
-
-<audio id="sound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
-
-<script>
-let me=null, current=null, chatId=null;
-
-auth.onAuthStateChanged(u=>{
-  if(u){
-    me=u;
-    document.getElementById("login").classList.add("hidden");
-    document.getElementById("app").classList.remove("hidden");
-    setStatus(true);
-    loadUsers();
+  // 1. ميزة Typing...
+  void _updateTypingStatus(bool isTyping) {
+    FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update({
+      'typing.$currentUserId': isTyping,
+    });
   }
-});
 
-window.onbeforeunload=()=>setStatus(false);
+  // 2. إرسال رسالة (نص أو صورة)
+  void _sendMessage(String content, String type) async {
+    if (content.trim().isEmpty && type == 'text') return;
 
-function login(){
-  auth.signInWithEmailAndPassword(email.value,pass.value)
-  .catch(e=>{
-    if(e.code==="auth/user-not-found"){
-      auth.createUserWithEmailAndPassword(email.value,pass.value)
-      .then(c=>{
-        const pid=Math.random().toString(36).substring(2,10);
-        db.collection("users").doc(c.user.uid).set({
-          username:username.value,
-          publicId:pid,
-          online:true,
-          lastSeen:Date.now(),
-          blocked:[]
-        });
-      });
+    await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).collection('messages').add({
+      'senderId': currentUserId,
+      'text': content,
+      'type': type,
+      'timestamp': FieldValue.serverTimestamp(),
+      'isSeen': false,
+    });
+
+    _messageController.clear();
+    _updateTypingStatus(false);
+  }
+
+  // 3. رفع الصور لـ Firebase Storage
+  Future _pickImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      File imageFile = File(pickedFile.path);
+      String fileName = DateTime.now().millisecondsSinceEpoch.toString();
+      var ref = FirebaseStorage.instance.ref().child('chat_images').child(fileName);
+      await ref.putFile(imageFile);
+      String imageUrl = await ref.getDownloadURL();
+      _sendMessage(imageUrl, 'image');
     }
-  });
-}
-
-function setStatus(on){
-  db.collection("users").doc(me.uid).update({
-    online:on,
-    lastSeen:Date.now()
-  });
-}
-
-function loadUsers(){
-  db.collection("users").onSnapshot(s=>{
-    users.innerHTML="";
-    s.forEach(d=>{
-      if(d.id===me.uid) return;
-      const u=d.data();
-      const div=document.createElement("div");
-      div.className="user";
-      div.innerHTML=`${u.username}<br>
-      <small class="${u.online?'online':'offline'}">
-      ${u.online?'🟢 Online':'⚪ Last seen '+new Date(u.lastSeen).toLocaleTimeString()}
-      </small>`;
-      div.onclick=()=>openChat(d.id,u.username);
-      users.appendChild(div);
-    });
-  });
-}
-
-function openChat(uid,name){
-  current=uid;
-  chatId=[me.uid,uid].sort().join("_");
-  chatHeader.innerText=name;
-  listen();
-}
-
-function send(){
-  if(!text.value && !file.files[0]) return;
-  if(file.files[0]){
-    const ref=storage.ref("chat/"+Date.now()+"_"+file.files[0].name);
-    ref.put(file.files[0]).then(s=>{
-      s.ref.getDownloadURL().then(url=>{
-        sendMsg({img:url});
-      });
-    });
-  }else{
-    sendMsg({text:text.value});
   }
-  text.value="";
-  file.value="";
-}
 
-function sendMsg(data){
-  db.collection("chats").doc(chatId).collection("messages").add({
-    ...data,
-    from:me.uid,
-    to:current,
-    time:Date.now(),
-    seen:false
-  });
-}
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl, // دعم اللغة العربية (RTL)
+      child: Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.receiverName),
+              // ميزة Online Status
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').doc(widget.receiverId).snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return Container();
+                  return Text(snapshot.data!['status'] ?? '', style: TextStyle(fontSize: 12));
+                },
+              ),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            // قائمة الرسائل
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('chats')
+                    .doc(widget.chatId)
+                    .collection('messages')
+                    .orderBy('timestamp', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+                  
+                  return ListView.builder(
+                    reverse: true,
+                    itemCount: snapshot.data!.docs.length,
+                    itemBuilder: (context, index) {
+                      var message = snapshot.data!.docs[index];
+                      bool isMe = message['senderId'] == currentUserId;
 
-function listen(){
-  db.collection("chats").doc(chatId)
-  .collection("messages").orderBy("time")
-  .onSnapshot(s=>{
-    msgs.innerHTML="";
-    s.forEach(d=>{
-      const m=d.data();
-      const div=document.createElement("div");
-      div.className="msg "+(m.from===me.uid?"me":"other");
-      if(m.text) div.innerText=m.text;
-      if(m.img) div.innerHTML=`<img src="${m.img}" width="150">`;
-      msgs.appendChild(div);
-      if(m.from!==me.uid){
-        d.ref.update({seen:true});
-        sound.play();
-      }
-    });
-    msgs.scrollTop=msgs.scrollHeight;
-  });
-}
-</script>
+                      // تحديث الـ Seen عند القراءة
+                      if (!isMe && message['isSeen'] == false) {
+                        message.reference.update({'isSeen': true});
+                      }
 
-</body>
-</html>
+                      return _buildMessageBubble(message, isMe);
+                    },
+                  );
+                },
+              ),
+            ),
+            
+            // مؤشر Typing...
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('chats').doc(widget.chatId).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data!['typing'][widget.receiverId] == true) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Align(alignment: Alignment.centerRight, child: Text("يكتب الآن...")),
+                  );
+                }
+                return SizedBox();
+              },
+            ),
+
+            // حقل الإدخال
+            _buildInputSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // فقاعة الرسالة (واجهة شبيهة بواتساب)
+  Widget _buildMessageBubble(DocumentSnapshot doc, bool isMe) {
+    return GestureDetector(
+      onLongPress: () => _showDeleteDialog(doc), // ميزة الحذف
+      child: Align(
+        alignment: isMe ? Alignment.centerLeft : Alignment.centerRight,
+        child: Container(
+          margin: EdgeInsets.all(8),
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isMe ? Color(0xFFDCF8C6) : Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              doc['type'] == 'text' 
+                ? Text(doc['text']) 
+                : Image.network(doc['text'], width: 200),
+              SizedBox(height: 5),
+              // علامة الصح (Seen)
+              if (isMe) Icon(Icons.done_all, size: 15, color: doc['isSeen'] ? Colors.blue : Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteDialog(DocumentSnapshot doc) {
+    showDialog(context: context, builder: (context) => AlertDialog(
+      title: Text("حذف الرسالة؟"),
+      actions: [
+        TextButton(onPressed: () => doc.reference.delete(), child: Text("حذف للجميع")),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text("إلغاء")),
+      ],
+    ));
+  }
+
+  Widget _buildInputSection() {
+    return Container(
+      padding: EdgeInsets.all(8),
+      child: Row(
+        children: [
+          IconButton(icon: Icon(Icons.image), onPressed: _pickImage),
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              onChanged: (val) => _updateTypingStatus(val.isNotEmpty),
+              decoration: InputDecoration(hintText: "اكتب رسالتك...", border: OutlineInputBorder(borderRadius: BorderRadius.circular(30))),
+            ),
+          ),
+          IconButton(icon: Icon(Icons.send), onPressed: () => _sendMessage(_messageController.text, 'text')),
+        ],
+      ),
+    );
+  }
+}
