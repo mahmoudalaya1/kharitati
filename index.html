@@ -2,8 +2,29 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>🔥 BS Chat</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BS Chat 🔥</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{margin:0;font-family:Arial;background:#ece5dd}
+.hidden{display:none}
+header{background:#075e54;color:#fff;padding:10px;text-align:center;font-weight:bold}
+#app{display:flex;height:100vh}
+#users{width:30%;background:#fff;border-left:1px solid #ccc;overflow:auto}
+#chat{flex:1;display:flex;flex-direction:column}
+.user{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+.user:hover{background:#f5f5f5}
+.msgs{flex:1;overflow:auto;padding:10px}
+.msg{max-width:70%;margin:5px;padding:8px;border-radius:7px}
+.me{background:#dcf8c6;margin-left:auto}
+.other{background:#fff}
+.footer{display:flex;gap:5px;padding:5px;background:#f0f0f0}
+.footer input{flex:1;padding:8px}
+.footer button{padding:8px}
+small{font-size:11px;color:#666}
+.online{color:green}
+.offline{color:gray}
+</style>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -11,47 +32,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
-<style>
-body{margin:0;font-family:tahoma;background:#ece5dd}
-header{background:#075e54;color:#fff;padding:10px;text-align:center}
-#container{display:flex;height:90vh}
-#users{width:30%;background:#fff;overflow:auto;border-left:1px solid #ccc}
-#chat{width:70%;display:flex;flex-direction:column}
-.user{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
-.user:hover{background:#f1f1f1}
-.msgs{flex:1;overflow:auto;padding:10px}
-.msg{margin:5px;max-width:70%;padding:8px;border-radius:6px}
-.me{background:#dcf8c6;margin-left:auto}
-.other{background:#fff}
-input,button{padding:8px}
-footer{display:flex}
-#typing{font-size:12px;color:gray;padding:5px}
-.online{color:green;font-size:10px}
-.offline{color:gray;font-size:10px}
-</style>
-</head>
-
-<body>
-
-<header>🔥 BS Chat</header>
-
-<div id="container">
-  <div id="users"></div>
-
-  <div id="chat">
-    <div id="typing"></div>
-    <div class="msgs" id="messages"></div>
-
-    <footer>
-      <input id="msg" placeholder="اكتب رسالة..." style="flex:1">
-      <input type="file" id="img">
-      <button onclick="sendMsg()">إرسال</button>
-    </footer>
-  </div>
-</div>
-
 <script>
-// 🔥 Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
   authDomain: "kharitati-5cb37.firebaseapp.com",
@@ -60,93 +41,155 @@ const firebaseConfig = {
   messagingSenderId: "296218682746",
   appId: "1:296218682746:web:e097a1279383dd02eea2c3"
 };
-
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-const storage = firebase.storage();
 
-let me, currentChat;
+const auth=firebase.auth();
+const db=firebase.firestore();
+const storage=firebase.storage();
+</script>
+</head>
 
-// 🔐 تسجيل تلقائي (تجربة)
-auth.signInAnonymously().then(u=>{
-  me = u.user.uid;
-  db.collection("users").doc(me).set({
-    online:true,
-    lastSeen:firebase.firestore.FieldValue.serverTimestamp(),
-    id:me.slice(0,6)
-  },{merge:true});
-  loadUsers();
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <header>BS Chat 🔥</header>
+  <div style="padding:20px">
+    <input id="email" placeholder="Email"><br><br>
+    <input id="pass" type="password" placeholder="Password"><br><br>
+    <input id="username" placeholder="اسم المستخدم (أول مرة)"><br><br>
+    <button onclick="login()">دخول</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div id="users"></div>
+  <div id="chat">
+    <header id="chatHeader">اختر صديق</header>
+    <div class="msgs" id="msgs"></div>
+    <div class="footer">
+      <input id="text" placeholder="اكتب رسالة…">
+      <input type="file" id="file">
+      <button onclick="send()">إرسال</button>
+    </div>
+  </div>
+</div>
+
+<audio id="sound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+<script>
+let me=null, current=null, chatId=null;
+
+auth.onAuthStateChanged(u=>{
+  if(u){
+    me=u;
+    document.getElementById("login").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    setStatus(true);
+    loadUsers();
+  }
 });
 
-window.onbeforeunload=()=>{
-  if(me) db.collection("users").doc(me).update({
-    online:false,
-    lastSeen:firebase.firestore.FieldValue.serverTimestamp()
-  });
-};
+window.onbeforeunload=()=>setStatus(false);
 
-// 👥 تحميل المستخدمين
+function login(){
+  auth.signInWithEmailAndPassword(email.value,pass.value)
+  .catch(e=>{
+    if(e.code==="auth/user-not-found"){
+      auth.createUserWithEmailAndPassword(email.value,pass.value)
+      .then(c=>{
+        const pid=Math.random().toString(36).substring(2,10);
+        db.collection("users").doc(c.user.uid).set({
+          username:username.value,
+          publicId:pid,
+          online:true,
+          lastSeen:Date.now(),
+          blocked:[]
+        });
+      });
+    }
+  });
+}
+
+function setStatus(on){
+  db.collection("users").doc(me.uid).update({
+    online:on,
+    lastSeen:Date.now()
+  });
+}
+
 function loadUsers(){
   db.collection("users").onSnapshot(s=>{
     users.innerHTML="";
     s.forEach(d=>{
-      if(d.id!==me){
-        users.innerHTML+=`
-          <div class="user" onclick="openChat('${d.id}')">
-            ${d.data().id}
-            <div class="${d.data().online?'online':'offline'}">
-              ${d.data().online?'🟢 Online':'⚪ Last Seen'}
-            </div>
-          </div>`;
-      }
+      if(d.id===me.uid) return;
+      const u=d.data();
+      const div=document.createElement("div");
+      div.className="user";
+      div.innerHTML=`${u.username}<br>
+      <small class="${u.online?'online':'offline'}">
+      ${u.online?'🟢 Online':'⚪ Last seen '+new Date(u.lastSeen).toLocaleTimeString()}
+      </small>`;
+      div.onclick=()=>openChat(d.id,u.username);
+      users.appendChild(div);
     });
   });
 }
 
-// 💬 فتح محادثة
-function openChat(id){
-  currentChat=[me,id].sort().join("_");
-  messages.innerHTML="";
-  db.collection("chats").doc(currentChat)
-    .collection("msgs")
-    .orderBy("t")
-    .onSnapshot(s=>{
-      messages.innerHTML="";
-      s.forEach(m=>{
-        let d=m.data();
-        messages.innerHTML+=`
-          <div class="msg ${d.u===me?'me':'other'}">
-            ${d.text||''}
-            ${d.img?`<img src="${d.img}" width="150">`:''}
-          </div>`;
+function openChat(uid,name){
+  current=uid;
+  chatId=[me.uid,uid].sort().join("_");
+  chatHeader.innerText=name;
+  listen();
+}
+
+function send(){
+  if(!text.value && !file.files[0]) return;
+  if(file.files[0]){
+    const ref=storage.ref("chat/"+Date.now()+"_"+file.files[0].name);
+    ref.put(file.files[0]).then(s=>{
+      s.ref.getDownloadURL().then(url=>{
+        sendMsg({img:url});
       });
     });
+  }else{
+    sendMsg({text:text.value});
+  }
+  text.value="";
+  file.value="";
 }
 
-// ✍️ إرسال رسالة
-function sendMsg(){
-  let text=msg.value;
-  if(!currentChat) return;
-  msg.value="";
-  db.collection("chats").doc(currentChat)
-    .collection("msgs")
-    .add({text,u:me,t:Date.now()});
-}
-
-// 📎 رفع صورة
-img.onchange=()=>{
-  if(!currentChat) return;
-  let f=img.files[0];
-  let ref=storage.ref("imgs/"+Date.now()+f.name);
-  ref.put(f).then(()=>{
-    ref.getDownloadURL().then(url=>{
-      db.collection("chats").doc(currentChat)
-        .collection("msgs")
-        .add({img:url,u:me,t:Date.now()});
-    });
+function sendMsg(data){
+  db.collection("chats").doc(chatId).collection("messages").add({
+    ...data,
+    from:me.uid,
+    to:current,
+    time:Date.now(),
+    seen:false
   });
-};
+}
+
+function listen(){
+  db.collection("chats").doc(chatId)
+  .collection("messages").orderBy("time")
+  .onSnapshot(s=>{
+    msgs.innerHTML="";
+    s.forEach(d=>{
+      const m=d.data();
+      const div=document.createElement("div");
+      div.className="msg "+(m.from===me.uid?"me":"other");
+      if(m.text) div.innerText=m.text;
+      if(m.img) div.innerHTML=`<img src="${m.img}" width="150">`;
+      msgs.appendChild(div);
+      if(m.from!==me.uid){
+        d.ref.update({seen:true});
+        sound.play();
+      }
+    });
+    msgs.scrollTop=msgs.scrollHeight;
+  });
+}
 </script>
 
 </body>
