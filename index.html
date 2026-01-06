@@ -7,22 +7,27 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Firebase SDK -->
+<!-- Firebase SDK - الإصدار المتوافق (بدون modules) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-<!-- Firebase Config -->
 <script>
+  // Your web app's Firebase configuration
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyCjFoFYNyoNQfRQEON9zI6ouy-0i1OX8i0",
+    authDomain: "kharitati-637a7.firebaseapp.com",
+    projectId: "kharitati-637a7",
+    storageBucket: "kharitati-637a7.firebasestorage.app",
+    messagingSenderId: "865817029786",
+    appId: "1:865817029786:web:e0dea360183b5f68ac4323",
+    measurementId: "G-85MQ9M08GK"
   };
+
+  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
+  
+  // الآن يمكنك استخدام auth و firestore كما في الكود القديم
   const auth = firebase.auth();
   const db = firebase.firestore();
 </script>
