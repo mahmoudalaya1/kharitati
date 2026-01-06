@@ -1,37 +1,427 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <title>خريطة مجانية</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>خريطتي - خريطة ذكية</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    #map { height: 100vh; width: 100%; }
-    .leaflet-control-search {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      padding: 5px 10px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- الشريط العلوي -->
+  <header>
+    <div class="header-left">
+      <h1>خريطتي</h1>
+      <div id="weather" class="weather">🌤️ جارٍ التحميل...</div>
+    </div>
+    <div class="search-container">
+      <input type="text" id="search" placeholder="ابحث عن مكان..." autocomplete="off" />
+      <div id="suggestions" class="suggestions"></div>
+    </div>
+    <button id="theme-toggle" title="تبديل الوضع">🌙</button>
+  </header>
+
+  <!-- الخريطة -->
   <div id="map"></div>
 
+  <!-- الأزرار العائمة -->
+  <div class="floating-buttons">
+    <button id="locate-btn" title="موقعي (اضغط مرتين للمتابعة)">📍</button>
+    <button id="route-btn" title="رسم مسار">🛣️</button>
+    <button id="share-btn" title="شارك موقعي">📤</button>
+    <button id="layers-btn" title="الطبقات">🗺️</button>
+  </div>
+
+  <!-- قائمة الطبقات -->
+  <div id="layers-menu" class="layers-menu">
+    <div data-layer="osm">🗺️ عادي</div>
+    <div data-layer="satellite">🛰️ قمر</div>
+    <div data-layer="terrain">🏔️ تضاريس</div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    const map = L.map('map').setView([33.5138, 36.2765], 13); // دمشق
-
-    // طبقة خريطة نظيفة (مثل Google)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // زر تحديد الموقع
-    L.control.locate({ position: 'topleft' }).addTo(map);
-  </script>
-  <!-- إضافة Locate Control (اختياري) -->
-  <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
+  <script src="app.js"></script>
 </body>
 </html>
+:root {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --header-bg: #1a1a1a;
+  --button-bg: #ffffff;
+  --card-bg: #ffffff;
+  --shadow: rgba(0,0,0,0.2);
+}
+
+[data-theme="dark"] {
+  --bg-color: #121212;
+  --text-color: #ffffff;
+  --header-bg: #000000;
+  --button-bg: #2d2d2d;
+  --card-bg: #1e1e1e;
+  --shadow: rgba(0,0,0,0.5);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* الشريط العلوي */
+header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--header-bg);
+  color: white;
+  padding: 12px 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#weather {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.search-container {
+  flex: 1;
+  position: relative;
+}
+
+#search {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 2px 6px var(--shadow);
+  font-size: 1rem;
+  background: white;
+  color: black;
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 1001;
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+}
+
+.suggestions div {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  color: var(--text-color);
+}
+
+.suggestions div:hover {
+  background: #f0f0f0;
+}
+
+#theme-toggle {
+  background: var(--button-bg);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1rem;
+  cursor: pointer;
+  color: white;
+}
+
+/* الخريطة */
+#map {
+  height: 100vh;
+  width: 100%;
+  z-index: 1;
+}
+
+/* الأزرار العائمة */
+.floating-buttons {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1000;
+}
+
+.floating-buttons button {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  background: var(--button-bg);
+  box-shadow: 0 2px 8px var(--shadow);
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color);
+}
+
+/* قائمة الطبقات */
+.layers-menu {
+  display: none;
+  position: absolute;
+  bottom: 200px;
+  right: 20px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px var(--shadow);
+  padding: 8px;
+  z-index: 1000;
+  width: 180px;
+  color: var(--text-color);
+}
+
+.layers-menu div {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.layers-menu div:hover {
+  background: #f0f0f0;
+}
+
+/* الوضع الليلي للخريطة (OSM لا يدعم داكن، لكن نغير التحكم) */
+.leaflet-control-zoom,
+.leaflet-bar a {
+  background: var(--button-bg) !important;
+  color: var(--text-color) !important;
+}
+// =============== الإعدادات ===============
+let map;
+let userMarker = null;
+let followMode = false;
+let routeLayer = null;
+let geolocationWatcher = null;
+
+// =============== تهيئة الخريطة ===============
+const initMap = () => {
+  map = L.map('map').setView([24.774265, 46.738586], 12);
+
+  const layers = {
+    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+    }),
+    terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map &copy; OpenTopoMap'
+    })
+  };
+
+  let currentLayer = layers.osm;
+  currentLayer.addTo(map);
+
+  // =============== التحكم في الطبقات ===============
+  document.getElementById('layers-btn').addEventListener('click', () => {
+    const menu = document.getElementById('layers-menu');
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  });
+
+  document.querySelectorAll('#layers-menu div').forEach(item => {
+    item.addEventListener('click', () => {
+      map.removeLayer(currentLayer);
+      currentLayer = layers[item.getAttribute('data-layer')];
+      currentLayer.addTo(map);
+      document.getElementById('layers-menu').style.display = 'none';
+    });
+  });
+
+  // =============== وضع الليلي ===============
+  const toggleTheme = () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    document.getElementById('theme-toggle').textContent = isDark ? '🌙' : '☀️';
+  };
+
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.body.setAttribute('data-theme', savedTheme);
+  document.getElementById('theme-toggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+  // =============== الطقس ===============
+  const updateWeather = (lat, lng) => {
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code`)
+      .then(res => res.json())
+      .then(data => {
+        const temp = data.current.temperature_2m;
+        const code = data.current.weather_code;
+        const weatherIcons = { 0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️', 51: '🌦️', 61: '🌧️', 71: '❄️', 80: '🌧️', 95: '⛈️' };
+        const icon = weatherIcons[code] || '🌤️';
+        document.getElementById('weather').textContent = `${icon} ${Math.round(temp)}°C`;
+      })
+      .catch(() => {
+        document.getElementById('weather').textContent = '🌤️ --°C';
+      });
+  };
+
+  // =============== البحث الذكي ===============
+  const searchInput = document.getElementById('search');
+  const suggestions = document.getElementById('suggestions');
+
+  const showSuggestions = (query) => {
+    if (!query.trim()) {
+      suggestions.style.display = 'none';
+      return;
+    }
+    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`)
+      .then(res => res.json())
+      .then(data => {
+        suggestions.innerHTML = '';
+        data.forEach(place => {
+          const div = document.createElement('div');
+          div.textContent = place.display_name;
+          div.addEventListener('click', () => {
+            const lat = parseFloat(place.lat);
+            const lng = parseFloat(place.lon);
+            map.setView([lat, lng], 15);
+            if (userMarker) map.removeLayer(userMarker);
+            userMarker = L.marker([lat, lng]).addTo(map).bindPopup(place.display_name).openPopup();
+            updateWeather(lat, lng);
+            searchInput.value = '';
+            suggestions.style.display = 'none';
+          });
+          suggestions.appendChild(div);
+        });
+        suggestions.style.display = data.length ? 'block' : 'none';
+      });
+  };
+
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value;
+    if (query.length > 2) {
+      setTimeout(() => showSuggestions(query), 300);
+    } else {
+      suggestions.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-container')) suggestions.style.display = 'none';
+  });
+
+  // =============== زر تحديد الموقع + Follow Mode ===============
+  document.getElementById('locate-btn').addEventListener('click', () => {
+    followMode = !followMode;
+    if (followMode) {
+      if (geolocationWatcher) navigator.geolocation.clearWatch(geolocationWatcher);
+      geolocationWatcher = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          if (userMarker) map.removeLayer(userMarker);
+          userMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+              html: '<div style="font-size:24px;transform:rotate('+ (pos.coords.heading || 0) +'deg)">📍</div>',
+              className: '',
+              iconSize: [30, 30]
+            })
+          }).addTo(map);
+          map.setView([lat, lng], 16);
+          updateWeather(lat, lng);
+        },
+        () => alert('فشل الوصول لموقعك'),
+        { enableHighAccuracy: true }
+      );
+    } else {
+      if (geolocationWatcher) {
+        navigator.geolocation.clearWatch(geolocationWatcher);
+        geolocationWatcher = null;
+      }
+    }
+  });
+
+  // =============== الملاحة ===============
+  document.getElementById('route-btn').addEventListener('click', () => {
+    if (!userMarker) {
+      alert('حدد موقعك أولًا (زر 📍)');
+      return;
+    }
+    const dest = prompt('أدخل وجهتك:');
+    if (!dest) return;
+
+    const userLatLng = userMarker.getLatLng();
+    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(dest)}&format=json&limit=1`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data[0]) return alert('المكان غير موجود');
+        const destLat = parseFloat(data[0].lat);
+        const destLng = parseFloat(data[0].lon);
+
+        if (routeLayer) map.removeLayer(routeLayer);
+        fetch(`https://router.project-osrm.org/route/v1/driving/${userLatLng.lng},${userLatLng.lat};${destLng},${destLat}?overview=full&geometries=geojson`)
+          .then(r => r.json())
+          .then(routeData => {
+            const coords = routeData.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            routeLayer = L.polyline(coords, { color: '#4285f4', weight: 5 }).addTo(map);
+            map.fitBounds(routeLayer.getBounds());
+          });
+      });
+  });
+
+  // =============== مشاركة الموقع ===============
+  document.getElementById('share-btn').addEventListener('click', () => {
+    if (!userMarker) {
+      alert('حدد موقعك أولًا');
+      return;
+    }
+    const lat = userMarker.getLatLng().lat;
+    const lng = userMarker.getLatLng().lng;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?lat=${lat}&lng=${lng}`;
+    if (navigator.share) {
+      navigator.share({ title: 'موقعي', url: shareUrl });
+    } else {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('تم نسخ الرابط: ' + shareUrl);
+      });
+    }
+  });
+
+  // =============== تحميل الموقع من الرابط (مشاركة) ===============
+  const urlParams = new URLSearchParams(window.location.search);
+  const lat = urlParams.get('lat');
+  const lng = urlParams.get('lng');
+  if (lat && lng) {
+    map.setView([parseFloat(lat), parseFloat(lng)], 15);
+    userMarker = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(map).bindPopup('الموقع المُشارك').openPopup();
+    updateWeather(parseFloat(lat), parseFloat(lng));
+  }
+};
+
+// =============== بدء التشغيل ===============
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initMap);
+} else {
+  initMap();
+}
