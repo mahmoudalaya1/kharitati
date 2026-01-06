@@ -4,61 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>خريطتي - خريطة ذكية</title>
+  <!-- Leaflet CSS (بدون مسافات) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 
-<!-- Firebase SDK - الإصدار المتوافق (بدون modules) -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDK (بدون مسافات) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-<script>
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCjFoFYNyoNQfRQEON9zI6ouy-0i1OX8i0",
-    authDomain: "kharitati-637a7.firebaseapp.com",
-    projectId: "kharitati-637a7",
-    storageBucket: "kharitati-637a7.firebasestorage.app",
-    messagingSenderId: "865817029786",
-    appId: "1:865817029786:web:e0dea360183b5f68ac4323",
-    measurementId: "G-85MQ9M08GK"
-  };
-
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  
-  // الآن يمكنك استخدام auth و firestore كما في الكود القديم
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-</script>
-
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCjFoFYNyoNQfRQEON9zI6ouy-0i1OX8i0",
+      authDomain: "kharitati-637a7.firebaseapp.com",
+      projectId: "kharitati-637a7",
+      storageBucket: "kharitati-637a7.firebasestorage.app",
+      messagingSenderId: "865817029786",
+      appId: "1:865817029786:web:e0dea360183b5f68ac4323",
+      measurementId: "G-85MQ9M08GK"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+  </script>
 </head>
 <body>
   <!-- الشريط العلوي -->
-<header>
-  <div class="header-left">
-    <h1>خريطتي</h1>
-    <div id="weather" class="weather">🌤️ جارٍ التحميل...</div>
-  </div>
-  <div class="search-container">
-    <input type="text" id="search" placeholder="ابحث عن مكان..." autocomplete="off" />
-    <div id="suggestions" class="suggestions"></div>
-  </div>
-  <button id="theme-toggle" title="تبديل الوضع">🌙</button>
-  <button id="login-btn" title="تسجيل الدخول">🔐</button> <!-- هذا الزر ضروري -->
-</header>
+  <header>
+    <div class="header-left">
+      <h1>خريطتي</h1>
+      <div id="weather" class="weather">🌤️ جارٍ التحميل...</div>
+    </div>
+    <div class="search-container">
+      <input type="text" id="search" placeholder="ابحث عن مكان..." autocomplete="off" />
+      <div id="suggestions" class="suggestions"></div>
+    </div>
+    <button id="theme-toggle" title="تبديل الوضع">🌙</button>
+    <button id="login-btn" title="تسجيل الدخول">🔐</button>
+  </header>
 
   <!-- الخريطة -->
   <div id="map"></div>
 
   <!-- الأزرار العائمة -->
   <div class="floating-buttons">
-    <button id="locate-btn" title="موقعي (اضغط مرتين للمتابعة)">📍</button>
+    <button id="locate-btn" title="موقعي">📍</button>
     <button id="route-btn" title="رسم مسار">🛣️</button>
-    <button id="share-btn" title="شارك موقعي">📤</button>
-    <button id="layers-btn" title="الطبقات">🗺️</button>
     <button id="offers-btn" title="عروض الطريق">👥</button>
     <button id="save-btn" title="حفظ الموقع">💾</button>
+    <button id="share-btn" title="شارك موقعي">📤</button>
+    <button id="layers-btn" title="الطبقات">🗺️</button>
   </div>
 
   <!-- قائمة الطبقات -->
@@ -68,6 +63,7 @@
     <div data-layer="terrain">🏔️ تضاريس</div>
   </div>
 
+  <!-- Leaflet JS (بدون مسافات) -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
