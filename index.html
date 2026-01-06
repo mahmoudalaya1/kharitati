@@ -1,193 +1,37 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-
-class ChatScreen extends StatefulWidget {
-  final String receiverId;
-  final String receiverName;
-  final String chatId;
-
-  ChatScreen({required this.receiverId, required this.receiverName, required this.chatId});
-
-  @override
-  _ChatScreenState createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
-
-  // 1. ميزة Typing...
-  void _updateTypingStatus(bool isTyping) {
-    FirebaseFirestore.instance.collection('chats').doc(widget.chatId).update({
-      'typing.$currentUserId': isTyping,
-    });
-  }
-
-  // 2. إرسال رسالة (نص أو صورة)
-  void _sendMessage(String content, String type) async {
-    if (content.trim().isEmpty && type == 'text') return;
-
-    await FirebaseFirestore.instance.collection('chats').doc(widget.chatId).collection('messages').add({
-      'senderId': currentUserId,
-      'text': content,
-      'type': type,
-      'timestamp': FieldValue.serverTimestamp(),
-      'isSeen': false,
-    });
-
-    _messageController.clear();
-    _updateTypingStatus(false);
-  }
-
-  // 3. رفع الصور لـ Firebase Storage
-  Future _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      File imageFile = File(pickedFile.path);
-      String fileName = DateTime.now().millisecondsSinceEpoch.toString();
-      var ref = FirebaseStorage.instance.ref().child('chat_images').child(fileName);
-      await ref.putFile(imageFile);
-      String imageUrl = await ref.getDownloadURL();
-      _sendMessage(imageUrl, 'image');
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>خريطة مجانية</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; width: 100%; }
+    .leaflet-control-search {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      padding: 5px 10px;
     }
-  }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
 
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl, // دعم اللغة العربية (RTL)
-      child: Scaffold(
-        appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.receiverName),
-              // ميزة Online Status
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(widget.receiverId).snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return Container();
-                  return Text(snapshot.data!['status'] ?? '', style: TextStyle(fontSize: 12));
-                },
-              ),
-            ],
-          ),
-        ),
-        body: Column(
-          children: [
-            // قائمة الرسائل
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('chats')
-                    .doc(widget.chatId)
-                    .collection('messages')
-                    .orderBy('timestamp', descending: true)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-                  
-                  return ListView.builder(
-                    reverse: true,
-                    itemCount: snapshot.data!.docs.length,
-                    itemBuilder: (context, index) {
-                      var message = snapshot.data!.docs[index];
-                      bool isMe = message['senderId'] == currentUserId;
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([33.5138, 36.2765], 13); // دمشق
 
-                      // تحديث الـ Seen عند القراءة
-                      if (!isMe && message['isSeen'] == false) {
-                        message.reference.update({'isSeen': true});
-                      }
+    // طبقة خريطة نظيفة (مثل Google)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-                      return _buildMessageBubble(message, isMe);
-                    },
-                  );
-                },
-              ),
-            ),
-            
-            // مؤشر Typing...
-            StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('chats').doc(widget.chatId).snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData && snapshot.data!['typing'][widget.receiverId] == true) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Align(alignment: Alignment.centerRight, child: Text("يكتب الآن...")),
-                  );
-                }
-                return SizedBox();
-              },
-            ),
-
-            // حقل الإدخال
-            _buildInputSection(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // فقاعة الرسالة (واجهة شبيهة بواتساب)
-  Widget _buildMessageBubble(DocumentSnapshot doc, bool isMe) {
-    return GestureDetector(
-      onLongPress: () => _showDeleteDialog(doc), // ميزة الحذف
-      child: Align(
-        alignment: isMe ? Alignment.centerLeft : Alignment.centerRight,
-        child: Container(
-          margin: EdgeInsets.all(8),
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isMe ? Color(0xFFDCF8C6) : Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              doc['type'] == 'text' 
-                ? Text(doc['text']) 
-                : Image.network(doc['text'], width: 200),
-              SizedBox(height: 5),
-              // علامة الصح (Seen)
-              if (isMe) Icon(Icons.done_all, size: 15, color: doc['isSeen'] ? Colors.blue : Colors.grey),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDeleteDialog(DocumentSnapshot doc) {
-    showDialog(context: context, builder: (context) => AlertDialog(
-      title: Text("حذف الرسالة؟"),
-      actions: [
-        TextButton(onPressed: () => doc.reference.delete(), child: Text("حذف للجميع")),
-        TextButton(onPressed: () => Navigator.pop(context), child: Text("إلغاء")),
-      ],
-    ));
-  }
-
-  Widget _buildInputSection() {
-    return Container(
-      padding: EdgeInsets.all(8),
-      child: Row(
-        children: [
-          IconButton(icon: Icon(Icons.image), onPressed: _pickImage),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              onChanged: (val) => _updateTypingStatus(val.isNotEmpty),
-              decoration: InputDecoration(hintText: "اكتب رسالتك...", border: OutlineInputBorder(borderRadius: BorderRadius.circular(30))),
-            ),
-          ),
-          IconButton(icon: Icon(Icons.send), onPressed: () => _sendMessage(_messageController.text, 'text')),
-        ],
-      ),
-    );
-  }
-}
+    // زر تحديد الموقع
+    L.control.locate({ position: 'topleft' }).addTo(map);
+  </script>
+  <!-- إضافة Locate Control (اختياري) -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
+</body>
+</html>
