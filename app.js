@@ -4,16 +4,15 @@ let userMarker = null;
 let followMode = false;
 let routeLayer = null;
 let geolocationWatcher = null;
-
 let currentUser = null;
 
-// =============== تسجيل الدخول ===============
+// =============== دوال Firebase ===============
 function login() {
   const email = prompt('أدخل البريد الإلكتروني:');
   const password = prompt('أدخل كلمة المرور:');
   if (!email || !password) return;
 
-  auth.signInWithEmailAndPassword(email, password)
+  firebase.auth().signInWithEmailAndPassword(email, password)
     .then(userCredential => {
       currentUser = userCredential.user;
       alert(`مرحبًا، ${currentUser.email}!`);
@@ -21,54 +20,41 @@ function login() {
     })
     .catch(error => {
       if (error.code === 'auth/user-not-found') {
-        // إنشاء مستخدم جديد
-        auth.createUserWithEmailAndPassword(email, password)
-          .then(() => {
-            alert('تم إنشاء الحساب بنجاح!');
-            login(); // إعادة تسجيل الدخول
-          })
-          .catch(err => alert('خطأ في إنشاء الحساب: ' + err.message));
+        if (confirm('الحساب غير موجود. هل تريد إنشاء واحد جديد؟')) {
+          firebase.auth().createUserWithEmailAndPassword(email, password)
+            .then(() => {
+              alert('تم إنشاء الحساب بنجاح!');
+              login();
+            })
+            .catch(err => alert('خطأ في إنشاء الحساب: ' + err.message));
+        }
       } else {
         alert('خطأ في تسجيل الدخول: ' + error.message);
       }
     });
 }
 
-// =============== حفظ الموقع ===============
 function saveLocation() {
   if (!currentUser) {
     alert('سجل دخولك أولًا!');
     return;
   }
-
   if (!userMarker) {
     alert('حدد موقعك أولًا!');
     return;
   }
 
-  const lat = userMarker.getLatLng().lat;
-  const lng = userMarker.getLatLng().lng;
-
-  db.collection('saved_locations').doc(currentUser.uid).set({
+  const { lat, lng } = userMarker.getLatLng();
+  firebase.firestore().collection('saved_locations').doc(currentUser.uid).set({
     lat,
     lng,
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
   }, { merge: true })
-  .then(() => {
-    alert('تم حفظ الموقع بنجاح!');
-  })
-  .catch(err => {
-    alert('خطأ في الحفظ: ' + err.message);
-  });
+    .then(() => alert('تم حفظ الموقع بنجاح!'))
+    .catch(err => alert('خطأ في الحفظ: ' + err.message));
 }
-// =============== تهيئة الخريطة ===============
-const initMap = () => {
-// =============== عروض يمين/يسار الطريق ===============
-document.getElementById('offers-btn').addEventListener('click', showOffers);
-document.getElementById('login-btn').addEventListener('click', login);
-document.getElementById('save-btn').addEventListener('click', saveLocation);
- 
-  function showOffers() {
+
+function showOffers() {
   if (!userMarker) {
     alert('حدد موقعك أولًا (زر 📍)');
     return;
@@ -77,16 +63,12 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
   const lat = userMarker.getLatLng().lat;
   const lng = userMarker.getLatLng().lng;
 
-  // استخدم Firebase أو Supabase لجلب العروض القريبة
-  // هنا نستخدم نموذجًا مزيفًا لتجربة الواجهة
-
   const fakeOffers = [
     { name: 'بيت للإيجار', type: 'إيجار', distance: '150 متر', side: 'يمين', lat: lat + 0.0001, lng: lng + 0.0001 },
     { name: 'سيارة للبيع', type: 'بيع', distance: '300 متر', side: 'يسار', lat: lat - 0.0001, lng: lng - 0.0001 },
     { name: 'مكتب للإيجار', type: 'إيجار', distance: '400 متر', side: 'يمين', lat: lat + 0.0002, lng: lng + 0.0002 }
   ];
 
-  // ارسم العروض على الخريطة
   fakeOffers.forEach(offer => {
     const marker = L.marker([offer.lat, offer.lng], {
       icon: L.divIcon({
@@ -95,15 +77,14 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
         iconSize: [30, 20]
       })
     }).addTo(map);
-
-    marker.bindPopup(`
-      <b>${offer.name}</b><br>
-      <span style="color:#888">${offer.distance} (${offer.side})</span>
-    `).openPopup();
+    marker.bindPopup(`<b>${offer.name}</b><br><span style="color:#888">${offer.distance} (${offer.side})</span>`).openPopup();
   });
 
   alert(`تم عرض ${fakeOffers.length} عروض قريبة من موقعك.`);
 }
+
+// =============== تهيئة الخريطة ===============
+const initMap = () => {
   map = L.map('map').setView([24.774265, 46.738586], 12);
 
   const layers = {
@@ -121,7 +102,7 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
   let currentLayer = layers.osm;
   currentLayer.addTo(map);
 
-  // =============== التحكم في الطبقات ===============
+  // =============== ربط الأزرار ===============
   document.getElementById('layers-btn').addEventListener('click', () => {
     const menu = document.getElementById('layers-menu');
     menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
@@ -136,81 +117,13 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
     });
   });
 
-  // =============== وضع الليلي ===============
-  const toggleTheme = () => {
+  document.getElementById('theme-toggle').addEventListener('click', () => {
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
     localStorage.setItem('theme', isDark ? 'light' : 'dark');
-    document.getElementById('theme-toggle').textContent = isDark ? '🌙' : '☀️';
-  };
-
-  const savedTheme = localStorage.getItem('theme') || 'light';
-  document.body.setAttribute('data-theme', savedTheme);
-  document.getElementById('theme-toggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-
-  // =============== الطقس ===============
-  const updateWeather = (lat, lng) => {
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code`)
-      .then(res => res.json())
-      .then(data => {
-        const temp = data.current.temperature_2m;
-        const code = data.current.weather_code;
-        const weatherIcons = { 0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️', 51: '🌦️', 61: '🌧️', 71: '❄️', 80: '🌧️', 95: '⛈️' };
-        const icon = weatherIcons[code] || '🌤️';
-        document.getElementById('weather').textContent = `${icon} ${Math.round(temp)}°C`;
-      })
-      .catch(() => {
-        document.getElementById('weather').textContent = '🌤️ --°C';
-      });
-  };
-
-  // =============== البحث الذكي ===============
-  const searchInput = document.getElementById('search');
-  const suggestions = document.getElementById('suggestions');
-
-  const showSuggestions = (query) => {
-    if (!query.trim()) {
-      suggestions.style.display = 'none';
-      return;
-    }
-    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`)
-      .then(res => res.json())
-      .then(data => {
-        suggestions.innerHTML = '';
-        data.forEach(place => {
-          const div = document.createElement('div');
-          div.textContent = place.display_name;
-          div.addEventListener('click', () => {
-            const lat = parseFloat(place.lat);
-            const lng = parseFloat(place.lon);
-            map.setView([lat, lng], 15);
-            if (userMarker) map.removeLayer(userMarker);
-            userMarker = L.marker([lat, lng]).addTo(map).bindPopup(place.display_name).openPopup();
-            updateWeather(lat, lng);
-            searchInput.value = '';
-            suggestions.style.display = 'none';
-          });
-          suggestions.appendChild(div);
-        });
-        suggestions.style.display = data.length ? 'block' : 'none';
-      });
-  };
-
-  searchInput.addEventListener('input', () => {
-    const query = searchInput.value;
-    if (query.length > 2) {
-      setTimeout(() => showSuggestions(query), 300);
-    } else {
-      suggestions.style.display = 'none';
-    }
+    document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
   });
 
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-container')) suggestions.style.display = 'none';
-  });
-
-  // =============== زر تحديد الموقع + Follow Mode ===============
   document.getElementById('locate-btn').addEventListener('click', () => {
     followMode = !followMode;
     if (followMode) {
@@ -241,12 +154,8 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
     }
   });
 
-  // =============== الملاحة ===============
   document.getElementById('route-btn').addEventListener('click', () => {
-    if (!userMarker) {
-      alert('حدد موقعك أولًا (زر 📍)');
-      return;
-    }
+    if (!userMarker) return alert('حدد موقعك أولًا (زر 📍)');
     const dest = prompt('أدخل وجهتك:');
     if (!dest) return;
 
@@ -269,25 +178,80 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
       });
   });
 
-  // =============== مشاركة الموقع ===============
   document.getElementById('share-btn').addEventListener('click', () => {
-    if (!userMarker) {
-      alert('حدد موقعك أولًا');
-      return;
-    }
-    const lat = userMarker.getLatLng().lat;
-    const lng = userMarker.getLatLng().lng;
+    if (!userMarker) return alert('حدد موقعك أولًا');
+    const { lat, lng } = userMarker.getLatLng();
     const shareUrl = `${window.location.origin}${window.location.pathname}?lat=${lat}&lng=${lng}`;
     if (navigator.share) {
       navigator.share({ title: 'موقعي', url: shareUrl });
     } else {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert('تم نسخ الرابط: ' + shareUrl);
-      });
+      navigator.clipboard.writeText(shareUrl).then(() => alert('تم نسخ الرابط: ' + shareUrl));
     }
   });
 
-  // =============== تحميل الموقع من الرابط (مشاركة) ===============
+  // =============== ربط أزرار Firebase ===============
+  if (document.getElementById('login-btn')) {
+    document.getElementById('login-btn').addEventListener('click', login);
+  }
+  if (document.getElementById('save-btn')) {
+    document.getElementById('save-btn').addEventListener('click', saveLocation);
+  }
+  if (document.getElementById('offers-btn')) {
+    document.getElementById('offers-btn').addEventListener('click', showOffers);
+  }
+
+  // =============== الطقس والبحث ===============
+  const updateWeather = (lat, lng) => {
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code`)
+      .then(res => res.json())
+      .then(data => {
+        const temp = data.current.temperature_2m;
+        const code = data.current.weather_code;
+        const weatherIcons = { 0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️', 51: '🌦️', 61: '🌧️', 71: '❄️', 80: '🌧️', 95: '⛈️' };
+        const icon = weatherIcons[code] || '🌤️';
+        document.getElementById('weather').textContent = `${icon} ${Math.round(temp)}°C`;
+      })
+      .catch(() => document.getElementById('weather').textContent = '🌤️ --°C');
+  };
+
+  const searchInput = document.getElementById('search');
+  const suggestions = document.getElementById('suggestions');
+  const showSuggestions = (query) => {
+    if (!query.trim()) return suggestions.style.display = 'none';
+    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`)
+      .then(res => res.json())
+      .then(data => {
+        suggestions.innerHTML = '';
+        data.forEach(place => {
+          const div = document.createElement('div');
+          div.textContent = place.display_name;
+          div.addEventListener('click', () => {
+            const lat = parseFloat(place.lat);
+            const lng = parseFloat(place.lon);
+            map.setView([lat, lng], 15);
+            if (userMarker) map.removeLayer(userMarker);
+            userMarker = L.marker([lat, lng]).addTo(map).bindPopup(place.display_name).openPopup();
+            updateWeather(lat, lng);
+            searchInput.value = '';
+            suggestions.style.display = 'none';
+          });
+          suggestions.appendChild(div);
+        });
+        suggestions.style.display = data.length ? 'block' : 'none';
+      });
+  };
+
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value;
+    if (query.length > 2) setTimeout(() => showSuggestions(query), 300);
+    else suggestions.style.display = 'none';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-container')) suggestions.style.display = 'none';
+  });
+
+  // =============== تحميل من الرابط ===============
   const urlParams = new URLSearchParams(window.location.search);
   const lat = urlParams.get('lat');
   const lng = urlParams.get('lng');
@@ -296,6 +260,11 @@ document.getElementById('save-btn').addEventListener('click', saveLocation);
     userMarker = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(map).bindPopup('الموقع المُشارك').openPopup();
     updateWeather(parseFloat(lat), parseFloat(lng));
   }
+
+  // =============== استعادة الوضع الليلي ===============
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.body.setAttribute('data-theme', savedTheme);
+  document.getElementById('theme-toggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 };
 
 // =============== بدء التشغيل ===============
