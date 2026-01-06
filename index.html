@@ -6,6 +6,27 @@
   <title>خريطتي - خريطة ذكية</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<!-- Firebase Config -->
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+</script>
+
 </head>
 <body>
   <!-- الشريط العلوي -->
@@ -13,6 +34,7 @@
     <div class="header-left">
       <h1>خريطتي</h1>
       <div id="weather" class="weather">🌤️ جارٍ التحميل...</div>
+      <button id="login-btn" title="تسجيل الدخول">🔐</button>
     </div>
     <div class="search-container">
       <input type="text" id="search" placeholder="ابحث عن مكان..." autocomplete="off" />
@@ -30,6 +52,7 @@
     <button id="route-btn" title="رسم مسار">🛣️</button>
     <button id="share-btn" title="شارك موقعي">📤</button>
     <button id="layers-btn" title="الطبقات">🗺️</button>
+    <button id="offers-btn" title="عروض الطريق">👥</button>
   </div>
 
   <!-- قائمة الطبقات -->
