@@ -5,8 +5,105 @@ let followMode = false;
 let routeLayer = null;
 let geolocationWatcher = null;
 
+let currentUser = null;
+
+// =============== تسجيل الدخول ===============
+function login() {
+  const email = prompt('أدخل البريد الإلكتروني:');
+  const password = prompt('أدخل كلمة المرور:');
+  if (!email || !password) return;
+
+  auth.signInWithEmailAndPassword(email, password)
+    .then(userCredential => {
+      currentUser = userCredential.user;
+      alert(`مرحبًا، ${currentUser.email}!`);
+      document.getElementById('login-btn').textContent = '👋 ' + currentUser.email.split('@')[0];
+    })
+    .catch(error => {
+      if (error.code === 'auth/user-not-found') {
+        // إنشاء مستخدم جديد
+        auth.createUserWithEmailAndPassword(email, password)
+          .then(() => {
+            alert('تم إنشاء الحساب بنجاح!');
+            login(); // إعادة تسجيل الدخول
+          })
+          .catch(err => alert('خطأ في إنشاء الحساب: ' + err.message));
+      } else {
+        alert('خطأ في تسجيل الدخول: ' + error.message);
+      }
+    });
+}
+
+// =============== حفظ الموقع ===============
+function saveLocation() {
+  if (!currentUser) {
+    alert('سجل دخولك أولًا!');
+    return;
+  }
+
+  if (!userMarker) {
+    alert('حدد موقعك أولًا!');
+    return;
+  }
+
+  const lat = userMarker.getLatLng().lat;
+  const lng = userMarker.getLatLng().lng;
+
+  db.collection('saved_locations').doc(currentUser.uid).set({
+    lat,
+    lng,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true })
+  .then(() => {
+    alert('تم حفظ الموقع بنجاح!');
+  })
+  .catch(err => {
+    alert('خطأ في الحفظ: ' + err.message);
+  });
+}
 // =============== تهيئة الخريطة ===============
 const initMap = () => {
+// =============== عروض يمين/يسار الطريق ===============
+document.getElementById('offers-btn').addEventListener('click', showOffers);
+document.getElementById('login-btn').addEventListener('click', login);
+document.getElementById('save-btn').addEventListener('click', saveLocation);
+ 
+  function showOffers() {
+  if (!userMarker) {
+    alert('حدد موقعك أولًا (زر 📍)');
+    return;
+  }
+
+  const lat = userMarker.getLatLng().lat;
+  const lng = userMarker.getLatLng().lng;
+
+  // استخدم Firebase أو Supabase لجلب العروض القريبة
+  // هنا نستخدم نموذجًا مزيفًا لتجربة الواجهة
+
+  const fakeOffers = [
+    { name: 'بيت للإيجار', type: 'إيجار', distance: '150 متر', side: 'يمين', lat: lat + 0.0001, lng: lng + 0.0001 },
+    { name: 'سيارة للبيع', type: 'بيع', distance: '300 متر', side: 'يسار', lat: lat - 0.0001, lng: lng - 0.0001 },
+    { name: 'مكتب للإيجار', type: 'إيجار', distance: '400 متر', side: 'يمين', lat: lat + 0.0002, lng: lng + 0.0002 }
+  ];
+
+  // ارسم العروض على الخريطة
+  fakeOffers.forEach(offer => {
+    const marker = L.marker([offer.lat, offer.lng], {
+      icon: L.divIcon({
+        html: `<div style="background:${offer.side === 'يمين' ? '#ff6b6b' : '#4ecdc4'};color:white;padding:4px;border-radius:4px;font-size:10px;">${offer.type}</div>`,
+        className: '',
+        iconSize: [30, 20]
+      })
+    }).addTo(map);
+
+    marker.bindPopup(`
+      <b>${offer.name}</b><br>
+      <span style="color:#888">${offer.distance} (${offer.side})</span>
+    `).openPopup();
+  });
+
+  alert(`تم عرض ${fakeOffers.length} عروض قريبة من موقعك.`);
+}
   map = L.map('map').setView([24.774265, 46.738586], 12);
 
   const layers = {
