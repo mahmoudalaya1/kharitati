@@ -1,67 +1,176 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>خريطتي - خريطة ذكية</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="style.css" />
-  
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الملاحة المتطور | محمود العيا</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCjFoFYNyoNQfRQEON9zI6ouy-0i1OX8i0",
-      authDomain: "kharitati-637a7.firebaseapp.com",
-      projectId: "kharitati-637a7",
-      storageBucket: "kharitati-637a7.firebasestorage.app",
-      messagingSenderId: "865817029786",
-      appId: "1:865817029786:web:e0dea360183b5f68ac4323",
-      measurementId: "G-85MQ9M08GK"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-  </script>
+    <style>
+        :root { --dark: #1a1a1a; --blue: #007AFF; --green: #28a745; --glass: rgba(26, 26, 26, 0.9); }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+
+        /* شريط البحث العلوي */
+        .search-container {
+            position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
+            width: 90%; z-index: 1000; display: flex; flex-direction: column; gap: 8px;
+        }
+        .search-box {
+            background: var(--glass); border-radius: 12px; padding: 10px 15px;
+            display: flex; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .search-box input {
+            background: transparent; border: none; color: white; flex: 1; padding: 5px 10px; outline: none;
+        }
+
+        /* الأزرار الجانبية المجمعة */
+        .controls-right {
+            position: fixed; right: 15px; top: 80px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .btn-group {
+            background: var(--glass); border-radius: 12px; display: flex; flex-direction: column;
+            overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .btn-group button {
+            background: transparent; border: none; color: white; padding: 12px;
+            font-size: 18px; border-bottom: 1px solid #333; cursor: pointer;
+        }
+        .btn-go {
+            background: var(--green) !important; color: white !important;
+            border-radius: 50% !important; width: 55px; height: 55px; border: none;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        /* اللوحة السفلية (Bottom Sheet) */
+        .bottom-card {
+            position: fixed; bottom: 0; left: 0; right: 0; background: var(--dark);
+            border-radius: 20px 20px 0 0; padding: 20px; z-index: 1001;
+            color: white; transform: translateY(70%); transition: 0.3s;
+        }
+        .bottom-card.active { transform: translateY(0); }
+        .handle { width: 40px; height: 4px; background: #555; margin: 0 auto 15px; border-radius: 2px; }
+        
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
-  <!-- الشريط العلوي -->
-  <header>
-    <div class="header-left">
-      <h1>خريطتي</h1>
-      <div id="weather" class="weather">🌤️ جارٍ التحميل...</div>
+
+<div id="map"></div>
+
+<div class="search-container">
+    <div class="search-box">
+        <i class="fas fa-bars" style="color: #aaa;"></i>
+        <input type="text" placeholder="ابحث عن وجهة، وقود، مطعم...">
+        <i class="fas fa-search" style="color: var(--blue);"></i>
     </div>
-    <div class="search-container">
-      <input type="text" id="search" placeholder="ابحث عن مكان..." autocomplete="off" />
-      <div id="suggestions" class="suggestions"></div>
+</div>
+
+<div class="controls-right">
+    <div class="btn-group">
+        <button onclick="changeLayer('sat')" title="قمر صناعي"><i class="fas fa-satellite"></i></button>
+        <button onclick="changeLayer('topo')" title="تضاريس"><i class="fas fa-mountain"></i></button>
+        <button onclick="locateUser()" title="تحديد موقعي"><i class="fas fa-location-crosshairs"></i></button>
     </div>
-    <button id="theme-toggle" title="تبديل الوضع">🌙</button>
-    <button id="login-btn" title="تسجيل الدخول">🔐</button>
-  </header>
+    <div class="btn-group">
+        <button onclick="toggleFollow()" id="followIcon"><i class="fas fa-compass"></i></button>
+        <button onclick="showWeather()"><i class="fas fa-cloud-sun"></i></button>
+    </div>
+    <button class="btn-go" onclick="startNav()"><i class="fas fa-play"></i></button>
+</div>
 
-  <!-- الخريطة -->
-  <div id="map"></div>
+<div class="bottom-card" id="mainCard">
+    <div class="handle" onclick="document.getElementById('mainCard').classList.toggle('active')"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 id="targetName" style="margin:0">مرحباً محمود</h3>
+            <p id="targetDist" style="color: #aaa; margin: 5px 0;">جاهز للانطلاق؟</p>
+        </div>
+        <button onclick="cancelNav()" id="closeBtn" class="hidden" style="background: #ff4444; border:none; color:white; padding:8px 15px; border-radius:8px;">إلغاء</button>
+    </div>
+</div>
 
-  <!-- الأزرار العائمة -->
-  <div class="floating-buttons">
-    <button id="locate-btn" title="موقعي">📍</button>
-    <button id="route-btn" title="رسم مسار">🛣️</button>
-    <button id="offers-btn" title="عروض الطريق">👥</button>
-    <button id="save-btn" title="حفظ الموقع">💾</button>
-    <button id="share-btn" title="شارك موقعي">📤</button>
-    <button id="layers-btn" title="الطبقات">🗺️</button>
-  </div>
+<script>
+    // 1. إعدادات Firebase (ضع بياناتك هنا)
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_BUCKET",
+        messagingSenderId: "YOUR_ID",
+        appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-  <!-- قائمة الطبقات -->
-  <div id="layers-menu" class="layers-menu">
-    <div data-layer="osm">🗺️ عادي</div>
-    <div data-layer="satellite">🛰️ قمر</div>
-    <div data-layer="terrain">🏔️ تضاريس</div>
-  </div>
+    // 2. إعداد الخريطة والطبقات
+    var map = L.map('map', { zoomControl: false }).setView([24.7136, 46.6753], 13);
+    
+    var layers = {
+        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map),
+        sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+        topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png')
+    };
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="app.js"></script>
+    function changeLayer(type) {
+        Object.values(layers).forEach(layer => map.removeLayer(layer));
+        layers[type].addTo(map);
+    }
+
+    // 3. تحديد الموقع والتتبع
+    var userMarker = L.marker([0,0], {icon: L.divIcon({className: 'user-icon', html: '<i class="fas fa-location-arrow" style="color:#007AFF; font-size:24px; transform:rotate(-45deg);"></i>'})}).addTo(map);
+    var isFollowing = false;
+
+    function locateUser() {
+        map.locate({setView: true, maxZoom: 16});
+    }
+
+    map.on('locationfound', function(e) {
+        userMarker.setLatLng(e.latlng);
+        if(isFollowing) map.panTo(e.latlng);
+        // تحديث الموقع في فيربيز
+        db.collection("locations").doc("user_1").set({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
+
+    function toggleFollow() {
+        isFollowing = !isFollowing;
+        document.getElementById('followIcon').style.color = isFollowing ? '#007AFF' : 'white';
+    }
+
+    // 4. نظام الملاحة (OSRM)
+    var routingControl = null;
+
+    function startNav() {
+        // مثال لوجهة ثابتة (يمكنك ربطها بالبحث)
+        var dest = [24.7742, 46.7385]; 
+        
+        if(routingControl) map.removeControl(routingControl);
+        
+        routingControl = L.Routing.control({
+            waypoints: [userMarker.getLatLng(), L.latLng(dest)],
+            lineOptions: { styles: [{ color: '#007AFF', opacity: 0.8, weight: 6 }] },
+            createMarker: function() { return null; } // إخفاء ماركرات المسار الافتراضية
+        }).addTo(map);
+
+        document.getElementById('mainCard').classList.add('active');
+        document.getElementById('closeBtn').classList.remove('hidden');
+        document.getElementById('targetName').innerText = "جاري التوجيه...";
+    }
+
+    function cancelNav() {
+        if(routingControl) map.removeControl(routingControl);
+        document.getElementById('mainCard').classList.remove('active');
+        document.getElementById('closeBtn').classList.add('hidden');
+    }
+
+</script>
 </body>
 </html>
