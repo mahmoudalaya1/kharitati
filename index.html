@@ -3,75 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Google Maps Real Navigation</title>
+    <title>خريطتي - KHARITATI</title>
     
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <style>
-        :root { --google-green: #0d652d; --google-blue: #1a73e8; --dark-bg: #000000; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Roboto', sans-serif; overflow: hidden; background: #000; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; transition: 0.5s; }
+        :root { --nav-green: #0d652d; --nav-blue: #1a73e8; --nav-black: #000000; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; background: #000; }
+        
+        /* الخريطة مع دعم الدوران الكامل */
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; transition: transform 0.2s ease-out; }
 
-        /* 1. واجهة الملاحة - الشريط العلوي الأخضر */
+        /* شريط العنوان - خريطتي */
+        .app-title { position: fixed; top: 0; width: 100%; background: #2c3e50; color: white; text-align: center; padding: 10px 0; z-index: 4000; font-weight: bold; font-size: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+        /* واجهة الملاحة العلوية (جوجل مابس) */
         #navHeader {
-            position: fixed; top: 0; width: 100%; z-index: 3000;
-            background: var(--google-green); color: white;
-            padding: 20px 15px; display: none; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: fixed; top: 45px; width: 94%; left: 3%; z-index: 3000;
+            background: var(--nav-green); color: white; border-radius: 12px;
+            padding: 15px; display: none; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
         }
-        #navHeader .instruction { flex: 1; font-size: 22px; font-weight: bold; text-align: right; margin-right: 15px; }
 
-        /* 2. واجهة الملاحة - اللوحة السفلية السوداء */
+        /* واجهة الملاحة السفلية (الأناقة السوداء) */
         #navFooter {
             position: fixed; bottom: 0; left: 0; width: 100%; z-index: 3000;
-            background: var(--dark-bg); color: white; padding: 15px 20px 30px 20px;
+            background: var(--nav-black); color: white; padding: 15px 20px 30px 20px;
             display: none; grid-template-columns: 1fr 2fr 1fr; align-items: center;
-            border-radius: 20px 20px 0 0; border-top: 1px solid #333;
+            border-top: 1px solid #333; border-radius: 20px 20px 0 0;
         }
 
-        /* 3. واجهة البحث العادية (قبل بدء المشوار) */
-        .search-container { position: fixed; top: 15px; width: 90%; left: 5%; z-index: 2000; background: white; border-radius: 30px; padding: 10px 20px; display: flex; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        .search-container input { border: none; flex: 1; outline: none; font-size: 16px; margin-right: 10px; text-align: right; }
+        /* خيارات الوجهة: البحث أو الضغط */
+        .search-box { position: fixed; top: 60px; width: 90%; left: 5%; z-index: 2000; background: white; border-radius: 25px; padding: 10px 15px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .search-box input { border: none; flex: 1; outline: none; font-size: 16px; text-align: right; }
 
-        /* ورقة البدء الزرقاء */
-        #preNavSheet { position: fixed; bottom: 0; width: 100%; background: white; z-index: 2100; border-radius: 20px 20px 0 0; padding: 20px; transform: translateY(100%); transition: 0.4s; text-align: center; }
-        #preNavSheet.active { transform: translateY(0); }
-        .btn-start { width: 100%; background: var(--google-blue); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 18px; margin-top: 10px; cursor: pointer; }
+        /* زر بدء المشوار */
+        #startPanel { position: fixed; bottom: 0; width: 100%; background: white; z-index: 2100; border-radius: 20px 20px 0 0; padding: 20px; transform: translateY(100%); transition: 0.4s; text-align: center; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); }
+        #startPanel.active { transform: translateY(0); }
+        .btn-go { width: 100%; background: var(--nav-blue); color: white; border: none; padding: 16px; border-radius: 12px; font-weight: bold; font-size: 18px; cursor: pointer; }
 
-        /* أيقونة الموقع (الدائرة الزرقاء المضيئة) */
-        .user-icon { width: 16px; height: 16px; background: #1a73e8; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px #1a73e8; }
+        .user-dot { width: 15px; height: 15px; background: #1a73e8; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 12px #1a73e8; }
     </style>
 </head>
 <body>
 
+<div class="app-title">خريطتي</div>
+
 <div id="map"></div>
 
 <div id="navHeader">
-    <div class="instruction" id="nextStep">اتجه نحو الوجهة المحددة</div>
-    <div style="font-size: 30px;"><i class="fas fa-arrow-up"></i></div>
+    <div style="flex: 1; font-size: 20px; font-weight: bold; text-align: right;" id="directionText">اتجه نحو المسار</div>
+    <div style="font-size: 28px;"><i class="fas fa-arrow-up"></i></div>
 </div>
 
-<div class="search-container" id="searchUI">
-    <i class="fas fa-search" style="color:#777"></i>
-    <input type="text" id="targetInput" placeholder="ابحث أو انقر على الخريطة...">
+<div class="search-box" id="searchUI">
+    <i class="fas fa-search" style="color:#888"></i>
+    <input type="text" id="destInput" placeholder="ابحث أو اضغط على الخريطة...">
 </div>
 
-<div id="preNavSheet">
-    <div id="destName" style="font-weight: bold; font-size: 18px;">تم تحديد الوجهة</div>
-    <div id="routeInfo" style="color: #666; margin: 5px 0;">-- دقيقة (-- كم)</div>
-    <button class="btn-start" onclick="enterNavigationMode()">بدء المشوار ▶️</button>
+<div id="startPanel">
+    <div id="destLabel" style="font-weight: bold; font-size: 18px; margin-bottom: 5px;">وجهة مختارة</div>
+    <div id="tripInfo" style="color: #666; margin-bottom: 15px;">-- دقيقة (-- كم)</div>
+    <button class="btn-go" onclick="startNavigation()">بدء المشوار ▶️</button>
 </div>
 
 <div id="navFooter">
-    <div onclick="location.reload()" style="background:#333; width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center;"><i class="fas fa-times"></i></div>
+    <div onclick="location.reload()" style="background:#444; width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center;"><i class="fas fa-times"></i></div>
     <div style="text-align: center;">
-        <div id="timeLeft" style="color: #f28b82; font-size: 24px; font-weight: bold;">-- د</div>
-        <div id="distArrival" style="color: #bdc1c6; font-size: 14px;">-- كم • --:-- م</div>
+        <div id="timeVal" style="color: #f28b82; font-size: 24px; font-weight: bold;">-- د</div>
+        <div id="distVal" style="color: #bdc1c6; font-size: 14px;">-- كم</div>
     </div>
     <div style="text-align: center;">
         <div style="color: #777; font-size: 12px;">كم/س</div>
-        <div id="speedo" style="font-size: 20px; font-weight: bold;">0</div>
+        <div id="speedVal" style="font-size: 20px; font-weight: bold;">0</div>
     </div>
 </div>
 
@@ -79,71 +88,68 @@
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-    // إعداد الخريطة مع دعم الدوران
+    // تهيئة خريطة "خريطتي"
     var map = L.map('map', { zoomControl: false }).setView([41.0082, 28.9784], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     var userMarker, destMarker, routeControl;
 
-    // الخيارين: البحث أو الضغط على الخريطة
+    // الخيار 1: الضغط على الخريطة
     map.on('click', function(e) {
-        setupDestination(e.latlng.lat, e.latlng.lng, "موقع مختار");
+        setNewDestination(e.latlng.lat, e.latlng.lng, "نقطة على الخريطة");
     });
 
-    function setupDestination(lat, lon, name) {
+    function setNewDestination(lat, lon, name) {
         if(destMarker) map.removeLayer(destMarker);
         destMarker = L.marker([lat, lon]).addTo(map);
-        document.getElementById('destName').innerText = name;
-        document.getElementById('preNavSheet').classList.add('active');
-        if(userMarker) calculateRoute();
+        document.getElementById('destLabel').innerText = name;
+        document.getElementById('startPanel').classList.add('active');
+        if(userMarker) updatePath();
     }
 
-    function calculateRoute() {
+    function updatePath() {
         if(routeControl) map.removeControl(routeControl);
         routeControl = L.Routing.control({
             waypoints: [userMarker.getLatLng(), destMarker.getLatLng()],
-            lineOptions: { styles: [{ color: '#1a73e8', weight: 8 }] },
+            lineOptions: { styles: [{ color: '#1a73e8', weight: 7 }] },
             createMarker: function() { return null; },
             show: false
         }).on('routesfound', function(e) {
             var r = e.routes[0];
-            let mins = Math.round(r.summary.totalTime / 60);
-            let kms = (r.summary.totalDistance / 1000).toFixed(1);
-            document.getElementById('routeInfo').innerText = `${mins} دقيقة (${kms} كم)`;
-            document.getElementById('timeLeft').innerText = mins + " د";
-            document.getElementById('distArrival').innerText = kms + " كم";
+            document.getElementById('tripInfo').innerText = Math.round(r.summary.totalTime / 60) + " دقيقة (" + (r.summary.totalDistance / 1000).toFixed(1) + " كم)";
+            document.getElementById('timeVal').innerText = Math.round(r.summary.totalTime / 60) + " د";
+            document.getElementById('distVal').innerText = (r.summary.totalDistance / 1000).toFixed(1) + " كم";
         }).addTo(map);
     }
 
-    // الدخول في وضع الملاحة الحقيقي (الأناقة)
-    function enterNavigationMode() {
-        if(!userMarker) { alert("يرجى تحديد موقعك أولاً"); return; }
+    // تفعيل وضع الملاحة الحقيقي والأناقة
+    function startNavigation() {
+        if(!userMarker) { alert("يرجى تفعيل الموقع بالسهم أولاً"); return; }
         
         document.getElementById('searchUI').style.display = 'none';
-        document.getElementById('preNavSheet').classList.remove('active');
+        document.getElementById('startPanel').classList.remove('active');
         document.getElementById('navHeader').style.display = 'flex';
         document.getElementById('navFooter').style.display = 'grid';
 
-        // إمالة الخريطة للوضع الثلاثي الأبعاد والدوران التلقائي
-        map.flyTo(userMarker.getLatLng(), 19, { animate: true, duration: 1.5 });
+        map.flyTo(userMarker.getLatLng(), 18);
         
+        // الدوران الكامل 360 درجة حسب البوصلة
         window.addEventListener('deviceorientation', function(e) {
             if(e.webkitCompassHeading) {
                 let heading = e.webkitCompassHeading;
-                // تدوير الخريطة 360 درجة مع إمالة 45 درجة
                 document.getElementById('map').style.transform = `rotate(${-heading}deg) perspective(1000px) rotateX(45deg)`;
             }
         });
     }
 
-    // تحديد الموقع التلقائي
+    // تحديد موقع المستخدم
     map.locate({setView: true, watch: true, enableHighAccuracy: true});
     map.on('locationfound', function(e) {
-        let locIcon = L.divIcon({ className: 'user-icon' });
+        var icon = L.divIcon({ className: 'user-dot' });
         if(!userMarker) {
-            userMarker = L.marker(e.latlng, { icon: locIcon }).addTo(map);
+            userMarker = L.marker(e.latlng, { icon: icon }).addTo(map);
         } else { userMarker.setLatLng(e.latlng); }
-        if(e.speed) document.getElementById('speedo').innerText = Math.round(e.speed * 3.6);
+        if(e.speed) document.getElementById('speedVal').innerText = Math.round(e.speed * 3.6);
     });
 </script>
 </body>
