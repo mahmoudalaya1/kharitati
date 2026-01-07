@@ -47,7 +47,36 @@
         .btn-opt { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 10px; background: white; cursor: pointer; }
 
         /* إخفاء العناصر عند الحاجة */
-        .hidden { display: none !important; }
+      .hidden { display: none !important; }
+
+        .bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: white;
+    z-index: 2100;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    /* أضف السطرين التاليين للتحكم بالإخفاء */
+    transition: transform 0.4s ease-in-out;
+    transform: translateY(0); 
+}
+
+/* هذا الكود هو الذي سيقوم بسحب اللوحة للأسفل عند الحاجة */
+.bottom-sheet.hidden-panel {
+    transform: translateY(90%); /* يسحب اللوحة ليبقى فقط طرفها العلوي ظاهراً */
+}
+       // عند لمس الخريطة، اجعل اللوحة تختفي للأسفل
+map.on('click', function() {
+    document.querySelector('.bottom-sheet').classList.add('hidden-panel');
+});
+
+// عند الضغط على زر البحث أو الملاحة، اجعلها تظهر مجدداً
+function showPanel() {
+    document.querySelector('.bottom-sheet').classList.remove('hidden-panel');
+} 
     </style>
 </head>
 <body>
