@@ -1,77 +1,185 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'chat_screen.dart'; // استدعاء صفحة الدردشة التي برمجناها سابقاً
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MAHMOUD ALAYA NAVIGATION</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
-class SearchScreen extends StatefulWidget {
-  @override
-  _SearchScreenState createState() => _SearchScreenState();
-}
+    <style>
+        :root { --blue: #4285F4; --red: #EA4335; --gray: #5f6368; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
 
-class _SearchScreenState extends State<SearchScreen> {
-  String searchID = "";
-  List searchResults = [];
+        /* شريط البحث المطور - حل مشكلة البطء */
+        .top-ui { 
+            position: fixed; top: 12px; width: 90%; left: 5%; z-index: 2000; 
+            background: white; border-radius: 24px; display: flex; align-items: center;
+            padding: 5px 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .top-ui input { border: none; flex: 1; padding: 10px; font-size: 16px; outline: none; }
 
-  // دالة البحث في قاعدة البيانات
-  void searchUser(String id) async {
-    var result = await FirebaseFirestore.instance
-        .collection('users')
-        .where('publicId', isEqualTo: id) // البحث عن التطابق في المعرف
-        .get();
+        /* قائمة الاقتراحات الفورية - حل مشكلة غياب الاقتراحات */
+        #suggestions {
+            position: fixed; top: 65px; left: 7%; width: 86%; background: white; 
+            z-index: 2000; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: none; max-height: 250px; overflow-y: auto;
+        }
+        .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; text-align: right; }
 
-    setState(() {
-      searchResults = result.docs;
+        /* الأزرار الجانبية والبوصلة */
+        .side-btns { position: fixed; right: 15px; bottom: 120px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
+        .fab { width: 52px; height: 52px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,0.3); cursor: pointer; color: var(--gray); }
+        .btn-nav { background: var(--blue); color: white !important; }
+
+        /* أيقونة البوصلة N - حل مشكلة عدم عملها */
+        .compass { position: fixed; left: 15px; top: 85px; z-index: 2000; background: white; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: transform 0.2s; }
+
+        /* لوحة معلومات الوجهة */
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: white;
+            z-index: 2100; border-radius: 20px 20px 0 0; padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); text-align: center;
+            transition: transform 0.4s; transform: translateY(100%);
+        }
+        .bottom-sheet.active { transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="suggestions"></div>
+
+<div class="top-ui">
+    <i class="fas fa-search"></i>
+    <input type="text" id="searchInput" placeholder="ابحث عن مكان (مثل: مسجد آيا صوفيا)..." autocomplete="off">
+    <i class="fas fa-microphone" style="color: var(--blue);"></i>
+</div>
+
+<div class="compass" id="compassIcon" onclick="resetNorth()"><i class="fas fa-compass" style="color:var(--red)"></i></div>
+
+<div class="side-btns">
+    <div class="fab" onclick="changeLayer()"><i class="fas fa-layer-group"></i></div>
+    <div class="fab" onclick="getMyLocation()"><i class="fas fa-location-arrow" id="locBtn"></i></div>
+    <div class="fab btn-nav" onclick="checkAndStart()"><i class="fas fa-directions"></i></div>
+</div>
+
+<div class="bottom-sheet" id="navSheet">
+    <h3 id="placeTitle" style="margin: 5px 0;">اسم الوجهة</h3>
+    <button onclick="startRoute()" style="width: 100%; background: var(--blue); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: bold; margin-top: 10px;">بدء المشوار ▶️</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+<script>
+    // 1. إعداد الخريطة والطبقات
+    var map = L.map('map', { zoomControl: false }).setView([41.0082, 28.9784], 13);
+    var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    var satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+    var userMarker, destMarker, routeControl;
+
+    // 2. البحث الذكي (حل مشكلة البطء والاقتراحات)
+    const sInput = document.getElementById('searchInput');
+    const sBox = document.getElementById('suggestions');
+    let searchTimeout;
+
+    sInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const val = e.target.value;
+        if (val.length < 3) { sBox.style.display = 'none'; return; }
+
+        searchTimeout = setTimeout(async () => {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${val}&limit=5`);
+                const data = await res.json();
+                sBox.innerHTML = '';
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerText = item.display_name;
+                    div.onclick = () => {
+                        selectLocation(item.lat, item.lon, item.display_name);
+                        sBox.style.display = 'none';
+                        sInput.value = item.display_name.split(',')[0];
+                    };
+                    sBox.appendChild(div);
+                });
+                sBox.style.display = 'block';
+            } catch (err) { console.error("خطأ في البحث"); }
+        }, 500);
     });
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl, // واجهة عربية
-      child: Scaffold(
-        appBar: AppBar(title: Text("البحث عن أصدقاء")),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(15.0),
-              child: TextField(
-                onChanged: (val) => searchID = val,
-                decoration: InputDecoration(
-                  hintText: "أدخل ID الصديق (مثال: user_123)",
-                  suffixIcon: IconButton(
-                    icon: Icon(Icons.search),
-                    onPressed: () => searchUser(searchID),
-                  ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: searchResults.length,
-                itemBuilder: (context, index) {
-                  var user = searchResults[index];
-                  return ListTile(
-                    leading: CircleAvatar(child: Icon(Icons.person)),
-                    title: Text(user['username']),
-                    subtitle: Text(user['publicId']),
-                    trailing: ElevatedButton(
-                      child: Text("مراسلة"),
-                      onPressed: () {
-                        // الانتقال لصفحة الدردشة مع هذا المستخدم
-                        Navigator.push(context, MaterialPageRoute(builder: (c) => ChatScreen(
-                          receiverId: user.id,
-                          receiverName: user['username'],
-                          chatId: "generated_chat_id", // يجب توليد ID موحد بين الطرفين
-                        )));
-                      },
-                    ),
-                  );
-                },
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-}
+    function selectLocation(lat, lon, name) {
+        if(destMarker) map.removeLayer(destMarker);
+        destMarker = L.marker([lat, lon]).addTo(map);
+        map.flyTo([lat, lon], 16);
+        document.getElementById('placeTitle').innerText = name.split(',')[0];
+        document.getElementById('navSheet').classList.add('active');
+    }
+
+    // 3. الملاحة وبدء المشوار (حل مشكلة عدم بدء المسار)
+    function checkAndStart() {
+        if (!userMarker) {
+            alert("يرجى تفعيل الموقع أولاً بالضغط على زر السهم");
+            getMyLocation();
+        } else if (!destMarker) {
+            alert("يرجى اختيار وجهة من البحث أولاً");
+        } else {
+            startRoute();
+        }
+    }
+
+    function startRoute() {
+        if(routeControl) map.removeControl(routeControl);
+        
+        routeControl = L.Routing.control({
+            waypoints: [userMarker.getLatLng(), destMarker.getLatLng()],
+            lineOptions: { styles: [{ color: '#4285F4', weight: 7 }] },
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            addWaypoints: false,
+            createMarker: function() { return null; }
+        }).addTo(map);
+        
+        document.getElementById('navSheet').classList.remove('active');
+        alert("تم رسم المسار بنجاح!");
+    }
+
+    // 4. تحديد الموقع والبوصلة
+    function getMyLocation() {
+        map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
+        document.getElementById('locBtn').style.color = '#4285F4';
+    }
+
+    map.on('locationfound', function(e) {
+        if(!userMarker) {
+            userMarker = L.circleMarker(e.latlng, { radius: 10, fillColor: '#4285F4', color: 'white', fillOpacity: 1, weight: 3 }).addTo(map);
+        } else {
+            userMarker.setLatLng(e.latlng);
+        }
+    });
+
+    // تشغيل دوران البوصلة N
+    window.addEventListener('deviceorientation', function(e) {
+        if(e.webkitCompassHeading) {
+            document.getElementById('compassIcon').style.transform = `rotate(${e.webkitCompassHeading}deg)`;
+        }
+    });
+
+    function resetNorth() {
+        map.setBearing(0); // إعادة الخريطة للشمال
+        document.getElementById('compassIcon').style.transform = `rotate(0deg)`;
+    }
+
+    function changeLayer() {
+        if(map.hasLayer(streetLayer)) { map.removeLayer(streetLayer); satLayer.addTo(map); }
+        else { map.removeLayer(satLayer); streetLayer.addTo(map); }
+    }
+</script>
+</body>
+</html>
+
