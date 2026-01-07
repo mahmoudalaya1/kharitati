@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MAHMOUD ALAYA NAVIGATION</title>
+    <title>MAHMOUD ALAYA NAVIGATION PRO</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -11,12 +11,12 @@
 
     <style>
         :root { --blue: #4285F4; --red: #EA4335; --gray: #5f6368; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; touch-action: none; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
 
-        /* إخفاء لوحة تعليمات الملاحة البيضاء المزعجة */
         .leaflet-routing-container { display: none !important; }
 
+        /* واجهة البحث العلوي */
         .top-ui { 
             position: fixed; top: 12px; width: 90%; left: 5%; z-index: 2000; 
             background: white; border-radius: 24px; display: flex; align-items: center;
@@ -31,13 +31,14 @@
         }
         .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; text-align: right; }
 
+        /* الأزرار الجانبية */
         .side-btns { position: fixed; right: 15px; bottom: 140px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
         .fab { width: 52px; height: 52px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,0.3); cursor: pointer; color: var(--gray); }
         .btn-nav { background: var(--blue); color: white !important; }
 
-        .compass { position: fixed; left: 15px; top: 85px; z-index: 2000; background: white; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: transform 0.2s; }
+        .compass { position: fixed; left: 15px; top: 85px; z-index: 2000; background: white; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: transform 0.2s; cursor: pointer; }
 
-        /* لوحة معلومات جوجل مابس السفلية */
+        /* اللوحة السفلية - واجهة الملاحة */
         .bottom-sheet {
             position: fixed; bottom: 0; left: 0; width: 100%; background: white;
             z-index: 2100; border-radius: 20px 20px 0 0; padding: 20px;
@@ -48,7 +49,7 @@
         
         .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .time-text { color: var(--blue); font-size: 20px; font-weight: bold; }
-        .dist-text { color: var(--gray); font-size: 16px; }
+        .start-btn { width: 100%; background: var(--blue); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -58,7 +59,7 @@
 
 <div class="top-ui">
     <i class="fas fa-search"></i>
-    <input type="text" id="searchInput" placeholder="ابحث في إسطنبول..." autocomplete="off">
+    <input type="text" id="searchInput" placeholder="ابحث أو اضغط مطولاً على الخريطة..." autocomplete="off">
 </div>
 
 <div class="compass" id="compassIcon" onclick="resetNorth()"><i class="fas fa-compass" style="color:var(--red)"></i></div>
@@ -72,76 +73,77 @@
 <div class="bottom-sheet" id="navSheet">
     <div class="info-row">
         <div style="text-align: right;">
-            <div id="placeTitle" style="font-weight: bold; font-size: 18px;">اسم الوجهة</div>
-            <div id="dist-left" class="dist-text">-- كم</div>
+            <div id="placeTitle" style="font-weight: bold; font-size: 18px;">الوجهة المحددة</div>
+            <div id="dist-left" style="color:var(--gray)">-- كم</div>
         </div>
         <div id="time-left" class="time-text">-- دقيقة</div>
     </div>
-    <button id="mainBtn" onclick="startRoute()" style="width: 100%; background: var(--blue); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px;">بدء المشوار ▶️</button>
+    <button id="mainBtn" class="start-btn" onclick="startRoute()">بدء المشوار ▶️</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-    var map = L.map('map', { zoomControl: false }).setView([41.0082, 28.9784], 13);
+    // تفعيل دوران الخريطة واللمس المتعدد
+    var map = L.map('map', { 
+        zoomControl: false,
+        rotate: true, 
+        touchRotate: true 
+    }).setView([41.0082, 28.9784], 13);
+
     var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     var satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 
     var userMarker, destMarker, routeControl;
 
-    const sInput = document.getElementById('searchInput');
-    const sBox = document.getElementById('suggestions');
-    let searchTimeout;
-
-    sInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        const val = e.target.value;
-        if (val.length < 3) { sBox.style.display = 'none'; return; }
-        searchTimeout = setTimeout(async () => {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${val}&limit=5`);
-            const data = await res.json();
-            sBox.innerHTML = '';
-            data.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'suggestion-item';
-                div.innerText = item.display_name;
-                div.onclick = () => {
-                    selectLocation(item.lat, item.lon, item.display_name);
-                    sBox.style.display = 'none';
-                    sInput.value = item.display_name.split(',')[0];
-                };
-                sBox.appendChild(div);
-            });
-            sBox.style.display = 'block';
-        }, 500);
+    // الخيار الثاني: اختيار الموقع بالضغط على الخريطة
+    map.on('click', function(e) {
+        selectLocation(e.latlng.lat, e.latlng.lng, "موقع تم اختياره");
     });
 
     function selectLocation(lat, lon, name) {
         if(destMarker) map.removeLayer(destMarker);
         destMarker = L.marker([lat, lon]).addTo(map);
-        map.flyTo([lat, lon], 16);
         document.getElementById('placeTitle').innerText = name.split(',')[0];
         document.getElementById('navSheet').classList.add('active');
         document.getElementById('mainBtn').innerText = "بدء المشوار ▶️";
+        document.getElementById('mainBtn').style.background = "#4285F4";
         document.getElementById('mainBtn').onclick = startRoute;
     }
 
-    function checkAndStart() {
-        if (!userMarker) { alert("اضغط على زر السهم لتحديد موقعك"); getMyLocation(); }
-        else if (!destMarker) { alert("ابحث عن وجهة أولاً"); }
-        else { startRoute(); }
-    }
+    // الخيار الأول: البحث عن الوجهة
+    const sInput = document.getElementById('searchInput');
+    const sBox = document.getElementById('suggestions');
+    sInput.addEventListener('input', async (e) => {
+        const val = e.target.value;
+        if (val.length < 3) { sBox.style.display = 'none'; return; }
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${val}&limit=5`);
+        const data = await res.json();
+        sBox.innerHTML = '';
+        data.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'suggestion-item';
+            div.innerText = item.display_name;
+            div.onclick = () => {
+                selectLocation(item.lat, item.lon, item.display_name);
+                map.flyTo([item.lat, item.lon], 16);
+                sBox.style.display = 'none';
+                sInput.value = item.display_name.split(',')[0];
+            };
+            sBox.appendChild(div);
+        });
+        sBox.style.display = 'block';
+    });
 
     function startRoute() {
+        if (!userMarker) { alert("حدد موقعك أولاً بالسهم"); return; }
         if(routeControl) map.removeControl(routeControl);
         
         routeControl = L.Routing.control({
             waypoints: [userMarker.getLatLng(), destMarker.getLatLng()],
             lineOptions: { styles: [{ color: '#1a73e8', weight: 8, opacity: 0.8 }] },
-            addWaypoints: false,
-            draggableWaypoints: false,
-            show: false, // إخفاء القائمة البيضاء
+            show: false,
             createMarker: function() { return null; }
         }).on('routesfound', function(e) {
             var routes = e.routes[0];
@@ -149,14 +151,13 @@
             document.getElementById('time-left').innerText = Math.round(routes.summary.totalTime / 60) + " دقيقة";
         }).addTo(map);
         
-        // تغيير الزر ليصبح "إنهاء" مثل جوجل مابس
         document.getElementById('mainBtn').innerText = "إنهاء المشوار";
         document.getElementById('mainBtn').style.background = "#ea4335";
         document.getElementById('mainBtn').onclick = function() { location.reload(); };
     }
 
     function getMyLocation() {
-        map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
+        map.locate({setView: true, maxZoom: 16, watch: true});
         document.getElementById('locBtn').style.color = '#4285F4';
     }
 
@@ -168,14 +169,18 @@
         }
     });
 
+    // دوران البوصلة N والخريطة
     window.addEventListener('deviceorientation', function(e) {
         if(e.webkitCompassHeading) {
-            document.getElementById('compassIcon').style.transform = `rotate(${e.webkitCompassHeading}deg)`;
+            var heading = e.webkitCompassHeading;
+            document.getElementById('compassIcon').style.transform = `rotate(${heading}deg)`;
+            // الخريطة الآن ستفتل معك بشكل دائري
+            map.setBearing(heading); 
         }
     });
 
     function resetNorth() {
-        map.setView(map.getCenter(), map.getZoom());
+        map.setBearing(0);
         document.getElementById('compassIcon').style.transform = `rotate(0deg)`;
     }
 
