@@ -14,7 +14,9 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
 
-        /* شريط البحث المطور - حل مشكلة البطء */
+        /* إخفاء لوحة تعليمات الملاحة البيضاء المزعجة */
+        .leaflet-routing-container { display: none !important; }
+
         .top-ui { 
             position: fixed; top: 12px; width: 90%; left: 5%; z-index: 2000; 
             background: white; border-radius: 24px; display: flex; align-items: center;
@@ -22,7 +24,6 @@
         }
         .top-ui input { border: none; flex: 1; padding: 10px; font-size: 16px; outline: none; }
 
-        /* قائمة الاقتراحات الفورية - حل مشكلة غياب الاقتراحات */
         #suggestions {
             position: fixed; top: 65px; left: 7%; width: 86%; background: white; 
             z-index: 2000; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
@@ -30,22 +31,24 @@
         }
         .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; text-align: right; }
 
-        /* الأزرار الجانبية والبوصلة */
-        .side-btns { position: fixed; right: 15px; bottom: 120px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
+        .side-btns { position: fixed; right: 15px; bottom: 140px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
         .fab { width: 52px; height: 52px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,0.3); cursor: pointer; color: var(--gray); }
         .btn-nav { background: var(--blue); color: white !important; }
 
-        /* أيقونة البوصلة N - حل مشكلة عدم عملها */
         .compass { position: fixed; left: 15px; top: 85px; z-index: 2000; background: white; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: transform 0.2s; }
 
-        /* لوحة معلومات الوجهة */
+        /* لوحة معلومات جوجل مابس السفلية */
         .bottom-sheet {
             position: fixed; bottom: 0; left: 0; width: 100%; background: white;
-            z-index: 2100; border-radius: 20px 20px 0 0; padding: 15px;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); text-align: center;
+            z-index: 2100; border-radius: 20px 20px 0 0; padding: 20px;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.2); text-align: center;
             transition: transform 0.4s; transform: translateY(100%);
         }
         .bottom-sheet.active { transform: translateY(0); }
+        
+        .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .time-text { color: var(--blue); font-size: 20px; font-weight: bold; }
+        .dist-text { color: var(--gray); font-size: 16px; }
     </style>
 </head>
 <body>
@@ -55,8 +58,7 @@
 
 <div class="top-ui">
     <i class="fas fa-search"></i>
-    <input type="text" id="searchInput" placeholder="ابحث عن مكان (مثل: مسجد آيا صوفيا)..." autocomplete="off">
-    <i class="fas fa-microphone" style="color: var(--blue);"></i>
+    <input type="text" id="searchInput" placeholder="ابحث في إسطنبول..." autocomplete="off">
 </div>
 
 <div class="compass" id="compassIcon" onclick="resetNorth()"><i class="fas fa-compass" style="color:var(--red)"></i></div>
@@ -68,22 +70,26 @@
 </div>
 
 <div class="bottom-sheet" id="navSheet">
-    <h3 id="placeTitle" style="margin: 5px 0;">اسم الوجهة</h3>
-    <button onclick="startRoute()" style="width: 100%; background: var(--blue); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: bold; margin-top: 10px;">بدء المشوار ▶️</button>
+    <div class="info-row">
+        <div style="text-align: right;">
+            <div id="placeTitle" style="font-weight: bold; font-size: 18px;">اسم الوجهة</div>
+            <div id="dist-left" class="dist-text">-- كم</div>
+        </div>
+        <div id="time-left" class="time-text">-- دقيقة</div>
+    </div>
+    <button id="mainBtn" onclick="startRoute()" style="width: 100%; background: var(--blue); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 16px;">بدء المشوار ▶️</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-    // 1. إعداد الخريطة والطبقات
     var map = L.map('map', { zoomControl: false }).setView([41.0082, 28.9784], 13);
     var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     var satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 
     var userMarker, destMarker, routeControl;
 
-    // 2. البحث الذكي (حل مشكلة البطء والاقتراحات)
     const sInput = document.getElementById('searchInput');
     const sBox = document.getElementById('suggestions');
     let searchTimeout;
@@ -92,25 +98,22 @@
         clearTimeout(searchTimeout);
         const val = e.target.value;
         if (val.length < 3) { sBox.style.display = 'none'; return; }
-
         searchTimeout = setTimeout(async () => {
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${val}&limit=5`);
-                const data = await res.json();
-                sBox.innerHTML = '';
-                data.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    div.innerText = item.display_name;
-                    div.onclick = () => {
-                        selectLocation(item.lat, item.lon, item.display_name);
-                        sBox.style.display = 'none';
-                        sInput.value = item.display_name.split(',')[0];
-                    };
-                    sBox.appendChild(div);
-                });
-                sBox.style.display = 'block';
-            } catch (err) { console.error("خطأ في البحث"); }
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${val}&limit=5`);
+            const data = await res.json();
+            sBox.innerHTML = '';
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerText = item.display_name;
+                div.onclick = () => {
+                    selectLocation(item.lat, item.lon, item.display_name);
+                    sBox.style.display = 'none';
+                    sInput.value = item.display_name.split(',')[0];
+                };
+                sBox.appendChild(div);
+            });
+            sBox.style.display = 'block';
         }, 500);
     });
 
@@ -120,18 +123,14 @@
         map.flyTo([lat, lon], 16);
         document.getElementById('placeTitle').innerText = name.split(',')[0];
         document.getElementById('navSheet').classList.add('active');
+        document.getElementById('mainBtn').innerText = "بدء المشوار ▶️";
+        document.getElementById('mainBtn').onclick = startRoute;
     }
 
-    // 3. الملاحة وبدء المشوار (حل مشكلة عدم بدء المسار)
     function checkAndStart() {
-        if (!userMarker) {
-            alert("يرجى تفعيل الموقع أولاً بالضغط على زر السهم");
-            getMyLocation();
-        } else if (!destMarker) {
-            alert("يرجى اختيار وجهة من البحث أولاً");
-        } else {
-            startRoute();
-        }
+        if (!userMarker) { alert("اضغط على زر السهم لتحديد موقعك"); getMyLocation(); }
+        else if (!destMarker) { alert("ابحث عن وجهة أولاً"); }
+        else { startRoute(); }
     }
 
     function startRoute() {
@@ -139,17 +138,23 @@
         
         routeControl = L.Routing.control({
             waypoints: [userMarker.getLatLng(), destMarker.getLatLng()],
-            lineOptions: { styles: [{ color: '#4285F4', weight: 7 }] },
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            lineOptions: { styles: [{ color: '#1a73e8', weight: 8, opacity: 0.8 }] },
             addWaypoints: false,
+            draggableWaypoints: false,
+            show: false, // إخفاء القائمة البيضاء
             createMarker: function() { return null; }
+        }).on('routesfound', function(e) {
+            var routes = e.routes[0];
+            document.getElementById('dist-left').innerText = (routes.summary.totalDistance / 1000).toFixed(1) + " كم";
+            document.getElementById('time-left').innerText = Math.round(routes.summary.totalTime / 60) + " دقيقة";
         }).addTo(map);
         
-        document.getElementById('navSheet').classList.remove('active');
-        alert("تم رسم المسار بنجاح!");
+        // تغيير الزر ليصبح "إنهاء" مثل جوجل مابس
+        document.getElementById('mainBtn').innerText = "إنهاء المشوار";
+        document.getElementById('mainBtn').style.background = "#ea4335";
+        document.getElementById('mainBtn').onclick = function() { location.reload(); };
     }
 
-    // 4. تحديد الموقع والبوصلة
     function getMyLocation() {
         map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
         document.getElementById('locBtn').style.color = '#4285F4';
@@ -163,7 +168,6 @@
         }
     });
 
-    // تشغيل دوران البوصلة N
     window.addEventListener('deviceorientation', function(e) {
         if(e.webkitCompassHeading) {
             document.getElementById('compassIcon').style.transform = `rotate(${e.webkitCompassHeading}deg)`;
@@ -171,7 +175,7 @@
     });
 
     function resetNorth() {
-        map.setBearing(0); // إعادة الخريطة للشمال
+        map.setView(map.getCenter(), map.getZoom());
         document.getElementById('compassIcon').style.transform = `rotate(0deg)`;
     }
 
