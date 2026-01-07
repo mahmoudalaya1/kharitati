@@ -2,175 +2,218 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الملاحة المتطور | محمود العيا</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>خرائط محمود العيا - النسخة الاحترافية</title>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { --dark: #1a1a1a; --blue: #007AFF; --green: #28a745; --glass: rgba(26, 26, 26, 0.9); }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        :root {
+            --google-blue: #4285F4;
+            --google-red: #EA4335;
+            --google-green: #34A853;
+            --google-yellow: #FBBC05;
+            --dark-panel: #202124;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Roboto', sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; background: #f8f9fa; }
+
+        /* واجهة الدخول (Auth Overlay) */
+        #authOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 2000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;
+        }
+        .auth-card { width: 100%; max-width: 400px; text-align: center; }
+        .auth-card img { width: 80px; border-radius: 50%; margin-bottom: 20px; }
+        .auth-input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-primary { background: var(--google-blue); color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-ghost { background: transparent; color: #5f6368; border: 1px solid #dadce0; width: 100%; padding: 12px; border-radius: 8px; margin-top: 10px; cursor: pointer; }
 
         /* شريط البحث العلوي */
-        .search-container {
-            position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
-            width: 90%; z-index: 1000; display: flex; flex-direction: column; gap: 8px;
+        .top-ui { position: fixed; top: 12px; width: 94%; left: 3%; z-index: 1000; }
+        .search-bar {
+            background: white; border-radius: 24px; display: flex; align-items: center;
+            padding: 8px 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
-        .search-box {
-            background: var(--glass); border-radius: 12px; padding: 10px 15px;
-            display: flex; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        .search-box input {
-            background: transparent; border: none; color: white; flex: 1; padding: 5px 10px; outline: none;
-        }
+        .search-bar input { border: none; flex: 1; padding: 8px; font-size: 16px; outline: none; }
 
-        /* الأزرار الجانبية المجمعة */
-        .controls-right {
-            position: fixed; right: 15px; top: 80px; z-index: 1000;
-            display: flex; flex-direction: column; gap: 12px;
+        /* أزرار التحكم الجانبية */
+        .side-btns { position: fixed; right: 12px; bottom: 120px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
+        .fab {
+            width: 48px; height: 48px; background: white; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3); color: #5f6368; cursor: pointer;
         }
-        .btn-group {
-            background: var(--glass); border-radius: 12px; display: flex; flex-direction: column;
-            overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        .btn-group button {
-            background: transparent; border: none; color: white; padding: 12px;
-            font-size: 18px; border-bottom: 1px solid #333; cursor: pointer;
-        }
-        .btn-go {
-            background: var(--green) !important; color: white !important;
-            border-radius: 50% !important; width: 55px; height: 55px; border: none;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-        }
+        .fab.active { color: var(--google-blue); }
+        .btn-go { background: var(--google-blue); color: white; width: 56px; height: 56px; }
 
-        /* اللوحة السفلية (Bottom Sheet) */
-        .bottom-card {
-            position: fixed; bottom: 0; left: 0; right: 0; background: var(--dark);
-            border-radius: 20px 20px 0 0; padding: 20px; z-index: 1001;
-            color: white; transform: translateY(70%); transition: 0.3s;
+        /* لوحة المعلومات (Bottom Sheet) */
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: white;
+            z-index: 1100; border-radius: 16px 16px 0 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding: 16px; box-sizing: border-box;
         }
-        .bottom-card.active { transform: translateY(0); }
-        .handle { width: 40px; height: 4px; background: #555; margin: 0 auto 15px; border-radius: 2px; }
+        .sheet-handle { width: 36px; height: 4px; background: #e8eaed; border-radius: 2px; margin: 0 auto 16px; }
         
-        .hidden { display: none; }
+        /* أيقونات الأماكن المخصصة */
+        .poi-icon { font-size: 20px; color: white; padding: 5px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .bg-fuel { background: #FF9800; }
+        .bg-food { background: #FF5252; }
+        .bg-hospital { background: #E91E63; }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<div id="map"></div>
-
-<div class="search-container">
-    <div class="search-box">
-        <i class="fas fa-bars" style="color: #aaa;"></i>
-        <input type="text" placeholder="ابحث عن وجهة، وقود، مطعم...">
-        <i class="fas fa-search" style="color: var(--blue);"></i>
+<div id="authOverlay">
+    <div class="auth-card">
+        <img src="https://via.placeholder.com/80" id="userPhoto" alt="User">
+        <h2 id="authTitle">تسجيل الدخول</h2>
+        <input type="email" id="email" class="auth-input" placeholder="البريد الإلكتروني">
+        <input type="password" id="password" class="auth-input" placeholder="كلمة المرور">
+        <button class="btn-primary" onclick="handleAuth()">دخول</button>
+        <button class="btn-ghost" onclick="toggleAuthMode()" id="toggleBtn">ليس لديك حساب؟ إنشاء حساب</button>
+        <div style="margin: 15px 0; color: #70757a;">أو</div>
+        <button class="btn-ghost" onclick="guestLogin()"><i class="fas fa-user-secret"></i> دخول كزائر</button>
     </div>
 </div>
 
-<div class="controls-right">
-    <div class="btn-group">
-        <button onclick="changeLayer('sat')" title="قمر صناعي"><i class="fas fa-satellite"></i></button>
-        <button onclick="changeLayer('topo')" title="تضاريس"><i class="fas fa-mountain"></i></button>
-        <button onclick="locateUser()" title="تحديد موقعي"><i class="fas fa-location-crosshairs"></i></button>
+<div class="top-ui">
+    <div class="search-bar">
+        <i class="fas fa-bars" onclick="openMenu()"></i>
+        <input type="text" id="destSearch" placeholder="البحث هنا (مطعم، وقود...)">
+        <i class="fas fa-microphone" style="color: var(--google-blue);"></i>
     </div>
-    <div class="btn-group">
-        <button onclick="toggleFollow()" id="followIcon"><i class="fas fa-compass"></i></button>
-        <button onclick="showWeather()"><i class="fas fa-cloud-sun"></i></button>
-    </div>
-    <button class="btn-go" onclick="startNav()"><i class="fas fa-play"></i></button>
 </div>
 
-<div class="bottom-card" id="mainCard">
-    <div class="handle" onclick="document.getElementById('mainCard').classList.toggle('active')"></div>
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h3 id="targetName" style="margin:0">مرحباً محمود</h3>
-            <p id="targetDist" style="color: #aaa; margin: 5px 0;">جاهز للانطلاق؟</p>
+<div class="side-btns">
+    <div class="fab" onclick="switchLayer()"><i class="fas fa-layer-group"></i></div>
+    <div class="fab" onclick="toggleTraffic()"><i class="fas fa-traffic-light"></i></div>
+    <div class="fab" onclick="locateMe()"><i class="fas fa-location-crosshairs" id="locIcon"></i></div>
+    <div class="fab btn-go" onclick="startNavigation()"><i class="fas fa-directions"></i></div>
+</div>
+
+<div class="bottom-sheet" id="infoSheet">
+    <div class="sheet-handle"></div>
+    <div id="sheetContent">
+        <h3 id="placeTitle" style="margin:0">استكشف حولك</h3>
+        <p id="placeDesc" style="color:#70757a">حدد وجهة للبدء في الملاحة الحية</p>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button class="btn-ghost" style="flex:1" onclick="findNearby('gas')">⛽ محطة</button>
+            <button class="btn-ghost" style="flex:1" onclick="findNearby('food')">🍴 مطعم</button>
         </div>
-        <button onclick="cancelNav()" id="closeBtn" class="hidden" style="background: #ff4444; border:none; color:white; padding:8px 15px; border-radius:8px;">إلغاء</button>
     </div>
 </div>
 
 <script>
-    // 1. إعدادات Firebase (ضع بياناتك هنا)
+    // 1. إعداد Firebase (ضع بياناتك الحقيقية هنا)
     const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_DOMAIN",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_BUCKET",
-        messagingSenderId: "YOUR_ID",
-        appId: "YOUR_APP_ID"
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "ID",
+        appId: "APP_ID"
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // 2. إعداد الخريطة والطبقات
+    // 2. إعداد الخريطة
     var map = L.map('map', { zoomControl: false }).setView([24.7136, 46.6753], 13);
     
     var layers = {
-        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map),
-        sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
-        topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png')
+        street: L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{ subdomains:['mt0','mt1','mt2','mt3'] }).addTo(map),
+        sat: L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{ subdomains:['mt0','mt1','mt2','mt3'] }),
+        traffic: L.tileLayer('https://{s}.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}',{ subdomains:['mt0','mt1','mt2','mt3'] })
     };
 
-    function changeLayer(type) {
-        Object.values(layers).forEach(layer => map.removeLayer(layer));
-        layers[type].addTo(map);
+    // 3. أيقونات مخصصة (موقعك الحالي - السهم - الدبوس)
+    var userIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background:var(--google-blue); width:15px; height:15px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5);'></div>" });
+    var userMarker = L.marker([0,0], {icon: userIcon}).addTo(map);
+    var isSignUp = false;
+
+    // 4. وظائف الحسابات (حقيقي)
+    function toggleAuthMode() {
+        isSignUp = !isSignUp;
+        document.getElementById('authTitle').innerText = isSignUp ? "إنشاء حساب جديد" : "تسجيل الدخول";
+        document.getElementById('toggleBtn').innerText = isSignUp ? "لديك حساب؟ سجل دخول" : "ليس لديك حساب؟ إنشاء حساب";
     }
 
-    // 3. تحديد الموقع والتتبع
-    var userMarker = L.marker([0,0], {icon: L.divIcon({className: 'user-icon', html: '<i class="fas fa-location-arrow" style="color:#007AFF; font-size:24px; transform:rotate(-45deg);"></i>'})}).addTo(map);
-    var isFollowing = false;
-
-    function locateUser() {
-        map.locate({setView: true, maxZoom: 16});
+    function handleAuth() {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        if(isSignUp) {
+            auth.createUserWithEmailAndPassword(email, pass).then(u => finishAuth());
+        } else {
+            auth.signInWithEmailAndPassword(email, pass).then(u => finishAuth()).catch(e => alert("خطأ في البيانات"));
+        }
     }
 
-    map.on('locationfound', function(e) {
-        userMarker.setLatLng(e.latlng);
-        if(isFollowing) map.panTo(e.latlng);
-        // تحديث الموقع في فيربيز
-        db.collection("locations").doc("user_1").set({ lat: e.latlng.lat, lng: e.latlng.lng });
-    });
+    function guestLogin() { finishAuth(); }
 
-    function toggleFollow() {
-        isFollowing = !isFollowing;
-        document.getElementById('followIcon').style.color = isFollowing ? '#007AFF' : 'white';
+    function finishAuth() {
+        document.getElementById('authOverlay').classList.add('hidden');
+        locateMe();
     }
 
-    // 4. نظام الملاحة (OSRM)
-    var routingControl = null;
-
-    function startNav() {
-        // مثال لوجهة ثابتة (يمكنك ربطها بالبحث)
-        var dest = [24.7742, 46.7385]; 
-        
+    // 5. الملاحة الحقيقية
+    var routingControl;
+    function startNavigation() {
         if(routingControl) map.removeControl(routingControl);
+        
+        // تحديد وجهة تجريبية (الرياض بارك مثلاً)
+        var dest = [24.7578, 46.6322]; 
         
         routingControl = L.Routing.control({
             waypoints: [userMarker.getLatLng(), L.latLng(dest)],
-            lineOptions: { styles: [{ color: '#007AFF', opacity: 0.8, weight: 6 }] },
-            createMarker: function() { return null; } // إخفاء ماركرات المسار الافتراضية
+            lineOptions: { styles: [{ color: '#4285F4', weight: 7 }] },
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+            createMarker: function(i, wp) {
+                return L.marker(wp.latLng, { draggable: true, icon: L.divIcon({html: '<i class="fas fa-map-marker-alt" style="color:var(--google-red); font-size:30px;"></i>', className:''}) });
+            }
         }).addTo(map);
-
-        document.getElementById('mainCard').classList.add('active');
-        document.getElementById('closeBtn').classList.remove('hidden');
-        document.getElementById('targetName').innerText = "جاري التوجيه...";
+        
+        document.getElementById('placeTitle').innerText = "جاري الملاحة...";
+        document.getElementById('placeDesc').innerText = "اتبع المسار الأزرق للوصول لوجهتك";
     }
 
-    function cancelNav() {
-        if(routingControl) map.removeControl(routingControl);
-        document.getElementById('mainCard').classList.remove('active');
-        document.getElementById('closeBtn').classList.add('hidden');
+    // 6. الموقع والطبقات
+    function locateMe() {
+        map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
     }
 
+    map.on('locationfound', (e) => {
+        userMarker.setLatLng(e.latlng);
+        // تتبع الموقع في Firestore (حقيقي)
+        if(auth.currentUser) {
+            db.collection("live_locations").doc(auth.currentUser.uid).set({
+                coords: new firebase.firestore.GeoPoint(e.latlng.lat, e.latlng.lng),
+                time: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    });
+
+    function switchLayer() {
+        if(map.hasLayer(layers.street)) { map.removeLayer(layers.street); layers.sat.addTo(map); }
+        else { map.removeLayer(layers.sat); layers.street.addTo(map); }
+    }
+
+    function toggleTraffic() {
+        if(map.hasLayer(layers.traffic)) map.removeLayer(layers.traffic);
+        else layers.traffic.addTo(map);
+    }
 </script>
 </body>
 </html>
+
