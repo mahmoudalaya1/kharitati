@@ -100,6 +100,19 @@
         }
     }
 
+async function findNearby(type) {
+    const center = map.getCenter(); // البحث حول المركز الحالي للخريطة
+    const category = type === 'gas' ? 'fuel' : 'restaurant';
+    
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${category}&lat=${center.lat}&lon=${center.lng}&bounded=1`);
+    const results = await response.json();
+    
+    results.forEach(place => {
+        L.marker([place.lat, place.lon]).addTo(map).bindPopup(place.display_name);
+    });
+    alert(`تم العثور على أقرب ${type} حولك`);
+}
+    
     // 3. دالة تحديد الموقع (تجنب التعليق)
     var userMarker;
     function getMyLocation() {
@@ -114,6 +127,36 @@
         }).addTo(map);
         console.log("تم تحديد الموقع بنجاح");
     });
+
+    // دالة البحث الذكي باستخدام Nominatim (مجانية وحقيقية)
+const searchInput = document.querySelector('.top-ui input');
+
+searchInput.addEventListener('input', async (e) => {
+    const query = e.target.value;
+    if (query.length < 3) return; // ابدأ البحث بعد كتابة 3 حروف
+
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5`);
+    const results = await response.json();
+    
+    // عرض النتائج (يمكنك تحسين الواجهة هنا)
+    console.log("نتائج البحث:", results); 
+});
+
+// دالة الانتقال للمكان المختار
+function goToPlace(lat, lon, name) {
+    map.setView([lat, lon], 17); // زووم عالي للمكان المختور
+    
+    // وضع الدبوس الأحمر 📍 [كما طلبت]
+    L.marker([lat, lon], {
+        icon: L.divIcon({
+            html: '<i class="fas fa-map-marker-alt" style="color:#EA4335; font-size:30px;"></i>',
+            className: 'dummy'
+        })
+    }).addTo(map).bindPopup(name).openPopup();
+    
+    // تحديث اللوحة السفلية باسم المكان
+    document.querySelector('.bottom-sheet h3').innerText = name;
+}
 
     map.on('locationerror', function(e) {
         alert("فشل الوصول لموقعك: تأكد من تفعيل GPS واستخدام HTTPS");
