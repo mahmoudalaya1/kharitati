@@ -1,168 +1,77 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'chat_screen.dart'; // استدعاء صفحة الدردشة التي برمجناها سابقاً
 
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>خريطتي NAVIGATION</title>
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+class SearchScreen extends StatefulWidget {
+  @override
+  _SearchScreenState createState() => _SearchScreenState();
+}
 
-    <style>
-        :root { --blue: #4285F4; --red: #EA4335; --gray: #5f6368; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+class _SearchScreenState extends State<SearchScreen> {
+  String searchID = "";
+  List searchResults = [];
 
-        /* شريط البحث العلوي */
-        .top-ui { 
-            position: fixed; top: 12px; width: 90%; left: 5%; z-index: 2000; 
-            background: white; border-radius: 24px; display: flex; align-items: center;
-            padding: 5px 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-        .top-ui input { border: none; flex: 1; padding: 10px; font-size: 16px; outline: none; }
+  // دالة البحث في قاعدة البيانات
+  void searchUser(String id) async {
+    var result = await FirebaseFirestore.instance
+        .collection('users')
+        .where('publicId', isEqualTo: id) // البحث عن التطابق في المعرف
+        .get();
 
-        /* قائمة الاقتراحات (لحل مشكلة البطء) */
-        #suggestions {
-            position: fixed; top: 65px; left: 7%; width: 86%; background: white; 
-            z-index: 2000; border-radius: 0 0 15px 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            display: none; max-height: 250px; overflow-y: auto;
-        }
-        .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; }
-
-        /* الأزرار الجانبية */
-        .side-btns { position: fixed; right: 15px; bottom: 120px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
-        .fab { width: 52px; height: 52px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,0.3); cursor: pointer; color: var(--gray); }
-        .btn-nav { background: var(--blue); color: white !important; }
-
-        /* البوصلة */
-        .compass { position: fixed; left: 15px; top: 85px; z-index: 2000; background: white; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-
-        /* اللوحة السفلية (التي كانت تعيقك) */
-        .bottom-sheet {
-            position: fixed; bottom: 0; left: 0; width: 100%; background: white;
-            z-index: 2100; border-radius: 20px 20px 0 0; padding: 15px;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); text-align: center;
-            transition: transform 0.4s ease-in-out; transform: translateY(100%);
-        }
-        .bottom-sheet.active { transform: translateY(0); }
-    </style>
-</head>
-<body>
-
-<div id="map"></div>
-<div id="suggestions"></div>
-
-<div class="top-ui">
-    <i class="fas fa-search"></i>
-    <input type="text" id="searchInput" placeholder="ابحث عن مكان في إسطنبول..." autocomplete="off">
-    <i class="fas fa-microphone" style="color: var(--blue);"></i>
-</div>
-
-<div class="compass" id="compassIcon"><i class="fas fa-compass" style="color:var(--red)"></i></div>
-
-<div class="side-btns">
-    <div class="fab" onclick="changeLayer()"><i class="fas fa-layer-group"></i></div>
-    <div class="fab" onclick="getMyLocation()"><i class="fas fa-location-arrow"></i></div>
-    <div class="fab btn-nav" onclick="startRoute()"><i class="fas fa-directions"></i></div>
-</div>
-
-<div class="bottom-sheet" id="navSheet">
-    <div style="width: 40px; height: 4px; background: #ddd; margin: 0 auto 10px; border-radius: 2px;"></div>
-    <h3 id="placeTitle" style="margin: 5px 0;">اسم الوجهة</h3>
-    <button onclick="startRoute()" style="width: 100%; background: var(--blue); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: bold; margin-top: 10px;">بدء المشوار ▶️</button>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-<script>
-    // 1. إعداد الخريطة في إسطنبول
-    var map = L.map('map', { zoomControl: false }).setView([41.0082, 28.9784], 13);
-    var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    var satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-
-    var userMarker, destMarker, routeControl;
-
-    // 2. البحث الذكي والاقتراحات (حل مشكلة البطء)
-    const sInput = document.getElementById('searchInput');
-    const sBox = document.getElementById('suggestions');
-    let searchTimeout;
-
-    sInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        const val = e.target.value;
-        if (val.length < 3) { sBox.style.display = 'none'; return; }
-
-        searchTimeout = setTimeout(async () => {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${val}&limit=5`);
-            const data = await res.json();
-            sBox.innerHTML = '';
-            data.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'suggestion-item';
-                div.innerText = item.display_name;
-                div.onclick = () => {
-                    selectLocation(item.lat, item.lon, item.display_name);
-                    sBox.style.display = 'none';
-                    sInput.value = item.display_name.split(',')[0];
-                };
-                sBox.appendChild(div);
-            });
-            sBox.style.display = 'block';
-        }, 400); // تأخير بسيط لمنع التعليق
+    setState(() {
+      searchResults = result.docs;
     });
+  }
 
-    function selectLocation(lat, lon, name) {
-        if(destMarker) map.removeLayer(destMarker);
-        destMarker = L.marker([lat, lon]).addTo(map);
-        map.flyTo([lat, lon], 16);
-        document.getElementById('placeTitle').innerText = name.split(',')[0];
-        document.getElementById('navSheet').classList.add('active');
-    }
-
-    // 3. رسم المسار والملاحة الحقيقية (حل مشكلة عدم بدء المسار)
-    function startRoute() {
-        if(!userMarker || !destMarker) {
-            alert("يرجى تحديد موقعك أولاً بالضغط على زر السهم");
-            getMyLocation();
-            return;
-        }
-        if(routeControl) map.removeControl(routeControl);
-        
-        routeControl = L.Routing.control({
-            waypoints: [userMarker.getLatLng(), destMarker.getLatLng()],
-            lineOptions: { styles: [{ color: '#4285F4', weight: 7 }] },
-            createMarker: function() { return null; }
-        }).addTo(map);
-        
-        document.getElementById('navSheet').classList.remove('active');
-    }
-
-    // 4. الموقع الحالي والدوران
-    function getMyLocation() {
-        map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
-    }
-
-    map.on('locationfound', function(e) {
-        if(!userMarker) {
-            userMarker = L.circleMarker(e.latlng, { radius: 10, fillColor: '#4285F4', color: 'white', fillOpacity: 1, weight: 3 }).addTo(map);
-        } else {
-            userMarker.setLatLng(e.latlng);
-        }
-    });
-
-    function changeLayer() {
-        if(map.hasLayer(streetLayer)) { map.removeLayer(streetLayer); satLayer.addTo(map); }
-        else { map.removeLayer(satLayer); streetLayer.addTo(map); }
-    }
-
-    // إخفاء اللوحة عند لمس الخريطة
-    map.on('click', () => {
-        document.getElementById('navSheet').classList.remove('active');
-        sBox.style.display = 'none';
-    });
-</script>
-</body>
-</html>
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl, // واجهة عربية
+      child: Scaffold(
+        appBar: AppBar(title: Text("البحث عن أصدقاء")),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(15.0),
+              child: TextField(
+                onChanged: (val) => searchID = val,
+                decoration: InputDecoration(
+                  hintText: "أدخل ID الصديق (مثال: user_123)",
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.search),
+                    onPressed: () => searchUser(searchID),
+                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: searchResults.length,
+                itemBuilder: (context, index) {
+                  var user = searchResults[index];
+                  return ListTile(
+                    leading: CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(user['username']),
+                    subtitle: Text(user['publicId']),
+                    trailing: ElevatedButton(
+                      child: Text("مراسلة"),
+                      onPressed: () {
+                        // الانتقال لصفحة الدردشة مع هذا المستخدم
+                        Navigator.push(context, MaterialPageRoute(builder: (c) => ChatScreen(
+                          receiverId: user.id,
+                          receiverName: user['username'],
+                          chatId: "generated_chat_id", // يجب توليد ID موحد بين الطرفين
+                        )));
+                      },
+                    ),
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
