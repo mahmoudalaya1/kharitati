@@ -2,157 +2,27 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>خريطتي - KHARITATI</title>
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
+    <title>تطبيق خريطتي</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <style>
-        :root { --g-green: #0d652d; --g-blue: #1a73e8; --dark: #121212; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
-
-        /* شريط الطقس والبروفايل */
-        .top-bar { position: fixed; top: 10px; left: 5%; width: 90%; z-index: 2000; display: flex; justify-content: space-between; }
-        .weather { background: white; padding: 5px 15px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 5px; }
-        .user-btn { width: 40px; height: 40px; background: var(--g-blue); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; }
-
-        /* واجهة البحث المصلحة */
-        .search-box { position: fixed; top: 60px; left: 5%; width: 90%; z-index: 2000; background: white; border-radius: 25px; display: flex; padding: 5px 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        .search-box input { border: none; flex: 1; outline: none; padding: 10px; }
-        .search-btn { background: var(--g-blue); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; margin-top: 5px; }
-
-        /* نافذة تسجيل الدخول */
-        #loginOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; display: none; align-items: center; justify-content: center; }
-        .login-box { background: white; width: 80%; padding: 25px; border-radius: 15px; text-align: center; }
-        .login-box input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
-        
-        /* أزرار الحالة (تسجيل الدخول/الخروج) */
-        #logoutBtn { display: none; background: #e74c3c; color: white; border: none; padding: 10px; border-radius: 8px; margin-top: 10px; width: 100%; }
-
-        /* واجهة الملاحة (مع زر X للإغلاق) */
-        #navUI { position: fixed; inset: 0; z-index: 4000; display: none; flex-direction: column; pointer-events: none; }
-        .nav-top { background: var(--g-green); color: white; padding: 20px; display: flex; justify-content: space-between; pointer-events: auto; }
-        .nav-bottom { margin-top: auto; background: black; color: white; padding: 20px; display: grid; grid-template-columns: 1fr 2fr 1fr; border-radius: 20px 20px 0 0; pointer-events: auto; }
-        .close-nav { background: #444; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-
-        /* الأيقونات السريعة */
-        .chips { display: flex; gap: 10px; overflow-x: auto; padding: 10px 5%; position: fixed; top: 115px; z-index: 2000; width: 90%; }
-        .chip { background: white; padding: 8px 15px; border-radius: 20px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; font-size: 14px; }
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
     </style>
 </head>
 <body>
-
-<div id="map"></div>
-
-<div id="mainUI">
-    <div class="top-bar">
-        <div class="weather"><i class="fas fa-cloud-sun"></i> 18°C</div>
-        <div class="user-btn" onclick="openLogin()"><i class="fas fa-user" id="userIcon"></i></div>
-    </div>
-
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="ابحث في خريطتي...">
-        <button class="search-btn" onclick="doSearch()">OK</button>
-    </div>
-
-    <div class="chips">
-        <div class="chip" onclick="quickSearch('مطعم')"><i class="fas fa-utensils"></i> مطاعم</div>
-        <div class="chip" onclick="quickSearch('محطة وقود')"><i class="fas fa-gas-pump"></i> محطات</div>
-        <div class="chip" onclick="quickSearch('فندق')"><i class="fas fa-hotel"></i> فنادق</div>
-    </div>
-</div>
-
-<div id="loginOverlay">
-    <div class="login-box">
-        <h3 id="modalTitle">تسجيل الدخول</h3>
-        <div id="loginFields">
-            <input type="email" id="email" placeholder="البريد الإلكتروني">
-            <input type="password" placeholder="كلمة المرور">
-            <button class="search-btn" style="width:100%; border-radius:8px;" onclick="processLogin()">دخول</button>
-        </div>
-        <button id="logoutBtn" onclick="processLogout()">تسجيل الخروج</button>
-        <button onclick="closeLogin()" style="border:none; background:none; margin-top:15px; color:#777;">إغلاق</button>
-    </div>
-</div>
-
-<div id="navUI">
-    <div class="nav-top">
-        <div style="font-size: 18px; font-weight: bold;">اتجه نحو Baruthane Sırtı</div>
-        <i class="fas fa-location-arrow"></i>
-    </div>
-    <div class="nav-bottom">
-        <div class="close-nav" onclick="stopNavigation()"><i class="fas fa-times"></i></div>
-        <div style="text-align: center;">
-            <div style="color: #f28b82; font-size: 22px; font-weight: bold;">12 د</div>
-            <div style="color: #bdc1c6; font-size: 12px;">2.5 كم • 6:32 م</div>
-        </div>
-        <div style="text-align: center;">
-            <div style="color: #777; font-size: 10px;">كم/س</div>
-            <div style="font-size: 18px; font-weight: bold;">0</div>
-        </div>
-    </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-    var map = L.map('map', { zoomControl: false }).setView([41.0082, 28.9784], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    // --- وظائف البحث ---
-    function doSearch() {
-        let val = document.getElementById('searchInput').value;
-        if(val) {
-            alert("جارٍ البحث عن: " + val);
-            startNavigation(); // محاكاة بدء الملاحة عند البحث
-        }
-    }
-
-    function quickSearch(type) {
-        document.getElementById('searchInput').value = type;
-        doSearch();
-    }
-
-    // --- وظائف الملاحة ---
-    function startNavigation() {
-        document.getElementById('mainUI').style.display = 'none';
-        document.getElementById('navUI').style.display = 'flex';
-        map.setZoom(18);
-        document.getElementById('map').style.transform = "perspective(1000px) rotateX(45deg)";
-    }
-
-    function stopNavigation() {
-        document.getElementById('mainUI').style.display = 'block';
-        document.getElementById('navUI').style.display = 'none';
-        map.setZoom(13);
-        document.getElementById('map').style.transform = "none";
-    }
-
-    // --- وظائف الحساب (Login/Logout) ---
-    function openLogin() { document.getElementById('loginOverlay').style.display = 'flex'; }
-    function closeLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
-
-    function processLogin() {
-        let email = document.getElementById('email').value;
-        if(email) {
-            document.getElementById('userIcon').className = "fas fa-check"; // تغيير شكل الأيقونة
-            document.getElementById('modalTitle').innerText = "أهلاً بك: " + email.split('@')[0];
-            document.getElementById('loginFields').style.display = 'none';
-            document.getElementById('logoutBtn').style.display = 'block';
-            alert("تم تسجيل الدخول بنجاح!");
-        }
-    }
-
-    function processLogout() {
-        document.getElementById('userIcon').className = "fas fa-user";
-        document.getElementById('modalTitle').innerText = "تسجيل الدخول";
-        document.getElementById('loginFields').style.display = 'block';
-        document.getElementById('logoutBtn').style.display = 'none';
-        alert("تم تسجيل الخروج");
-        closeLogin();
-    }
-</script>
+    <div id="map"></div>
+    <script>
+        // التوكن الخاص بحسابك في Mapbox
+        mapboxgl.accessToken = 'pk.eyJ1IjoibWFobW91ZDEyMiIsImEiOiJjbTVtcXNqYm0wMDloMmtzYnV1ZnpnYzZ2In0.NHNOdln5ZCXjtDFya-Z0PQ';
+        
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/navigation-night-v1', // التصميم الليلي الذي أعجبك
+            center: [28.9784, 41.0082], // إسطنبول كبداية
+            zoom: 12,
+            pitch: 60 // رؤية 3D احترافية
+        });
+    </script>
 </body>
 </html>
