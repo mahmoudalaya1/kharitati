@@ -1,28 +1,63 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>تطبيق خريطتي</title>
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
-    <style>
-        body { margin: 0; padding: 0; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script>
-        // التوكن الخاص بحسابك في Mapbox
-        mapboxgl.accessToken = 'pk.eyJ1IjoibWFobW91ZDEyMiIsImEiOiJjbTVtcXNqYm0wMDloMmtzYnV1ZnpnYzZ2In0.NHNOdln5ZCXjtDFya-Z0PQ';
-        
-        const map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/navigation-night-v1', // التصميم الليلي الذي أعجبك
-            center: [28.9784, 41.0082], // إسطنبول كبداية
-            zoom: 12,
-            pitch: 60 // رؤية 3D احترافية
-        });
-    </script>
-</body>
-</html>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDr5hql0t0eI0AYi7-_xLZfYpFw8F6vXRA",
+    authDomain: "kharitati-5cb37.firebaseapp.com",
+    projectId: "kharitati-5cb37",
+    storageBucket: "kharitati-5cb37.firebasestorage.app",
+    messagingSenderId: "296218682746",
+    appId: "1:296218682746:web:e097a1279383dd02eea2c3"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+</script>
+
+<button id="googleLogin">تسجيل الدخول باستخدام Google</button>
+<button id="logout" style="display:none">تسجيل الخروج</button>
+
+<script type="module">
+  const provider = new GoogleAuthProvider();
+
+  document.getElementById("googleLogin").onclick = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // إنشاء / تحديث المستخدم في Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        online: true,
+        lastSeen: serverTimestamp(),
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
+      alert("تم تسجيل الدخول ✅");
+    } catch (e) {
+      console.error(e);
+      alert("خطأ بتسجيل الدخول");
+    }
+  };
+
+  document.getElementById("logout").onclick = async () => {
+    await signOut(auth);
+  };
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      document.getElementById("googleLogin").style.display = "none";
+      document.getElementById("logout").style.display = "block";
+      console.log("مستخدم مسجل:", user.uid);
+    } else {
+      document.getElementById("googleLogin").style.display = "block";
+      document.getElementById("logout").style.display = "none";
+    }
+  });
+</script>
