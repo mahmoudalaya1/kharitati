@@ -1,53 +1,34 @@
-<section style="padding:40px 0">
-  <h2 style="text-align:center;margin-bottom:20px">
-    📍 موقع شركة علايا – حلب
-  </h2>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>ALAYA TUBE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;font-family:tahoma;background:#0f0f0f;color:white}
+header{padding:12px 20px;background:#181818;font-size:22px;font-weight:bold}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding:20px}
+.card{background:#202020;border-radius:12px;overflow:hidden}
+.card video{width:100%;height:160px;object-fit:cover}
+.card .info{padding:10px}
+.card h3{margin:0;font-size:16px}
+.card span{font-size:13px;color:#aaa}
+</style>
+</head>
 
-  <!-- خريطة ثابتة -->
-  <iframe
-    src="https://www.google.com/maps?q=شركة%20علايا%20حلب&t=&z=15&ie=UTF8&iwloc=&output=embed"
-    width="100%"
-    height="400"
-    style="border:0;border-radius:16px"
-    loading="lazy">
-  </iframe>
+<body>
 
-  <!-- أزرار -->
-  <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+<header>▶️ ALAYA TUBE</header>
 
-    <!-- فتح الخريطة -->
-    <a
-      href="https://www.google.com/maps/search/?api=1&query=شركة+علايا+حلب"
-      target="_blank"
-      style="padding:14px 22px;background:#0b5ed7;color:#fff;border-radius:10px;font-weight:bold;text-decoration:none">
-      🗺️ افتح الموقع على Google Maps
-    </a>
-
-    <!-- موقعي الآن -->
-    <button
-      onclick="getLocation()"
-      style="padding:14px 22px;background:#16a34a;color:#fff;border-radius:10px;font-weight:bold;border:none;cursor:pointer">
-      📍 موقعي الآن
-    </button>
-
+<div class="grid">
+  <div class="card">
+    <video src="videos/video1.mp4" controls></video>
+    <div class="info">
+      <h3>فيديو تجريبي</h3>
+      <span>شركة علايا • 1,245 مشاهدة</span>
+    </div>
   </div>
-</section>
+</div>
 
-<script>
-function getLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      let lat = position.coords.latitude;
-      let lng = position.coords.longitude;
-      window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=شركة+علايا+حلب&origin=${lat},${lng}`,
-        '_blank'
-      );
-    }, function() {
-      alert("يرجى السماح بالوصول إلى الموقع");
-    });
-  } else {
-    alert("المتصفح لا يدعم تحديد الموقع");
-  }
-}
-</script>
+</body>
+</html>
