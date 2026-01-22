@@ -8,14 +8,14 @@
 body{
   margin:0;
   font-family: Arial;
-  background:#f0f0f0;
+  background:#f4f4f4;
   text-align:center;
   direction:rtl;
 }
 
 h1{
-  background:#8b0000;
-  color:#ffd700;
+  background:#006400;
+  color:#fff;
   padding:15px;
   margin:0;
 }
@@ -28,25 +28,25 @@ h1{
 #grid{
   display:grid;
   grid-template-columns: repeat(20, 1fr); /* 200 عنصر */
-  gap:8px;
+  gap:10px;
   max-width:900px;
   margin:20px auto;
 }
 
 .cell{
-  font-size:28px;
+  font-size:30px;
   cursor:pointer;
   user-select:none;
   display:flex;
   align-items:center;
   justify-content:center;
-  height:36px;
+  height:38px;
 }
 
-/* الفرق المعقول */
+/* الفرق الواضح والمريح */
 .diff{
-  font-size:24px;          /* أصغر شوي */
-  filter: brightness(1.2); /* أفتح شوي */
+  font-size:24px;
+  opacity:0.7;
 }
 </style>
 </head>
@@ -60,6 +60,7 @@ h1{
 <script>
 const animals = ["🐦","🦅","🦒","🦁","🐄","🐑"];
 const SIZE = 200;
+
 let time = 10;
 let timer;
 
@@ -85,10 +86,10 @@ function startGame(){
 
     span.onclick = () => {
       if(i === diffIndex){
-        alert("😄 صح! ممتاز");
+        alert("🎉 صح! حلوة 👌");
         startGame();
       }else{
-        alert("❌ غلط");
+        alert("❌ جرّب مرة ثانية");
       }
     };
 
@@ -110,4 +111,3 @@ startGame();
 
 </body>
 </html>
-ر
