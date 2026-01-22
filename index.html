@@ -20,15 +20,6 @@ h1{
   margin:0;
 }
 
-#controls{
-  margin:10px;
-}
-
-select{
-  font-size:16px;
-  padding:5px;
-}
-
 #info{
   margin:10px;
   font-size:18px;
@@ -36,7 +27,7 @@ select{
 
 #grid{
   display:grid;
-  grid-template-columns: repeat(20, 1fr);
+  grid-template-columns: repeat(20, 1fr); /* 200 عنصر */
   gap:8px;
   max-width:920px;
   margin:20px auto;
@@ -52,22 +43,13 @@ select{
   height:36px;
 }
 
-/* الاختلاف حسب الصعوبة */
-.easy{
-  font-size:22px;
-  filter: brightness(1.4);
-}
-
-.medium{
+/* الفرق (واضح بس مو قاسي) */
+.diff{
   font-size:24px;
   filter: brightness(1.2);
 }
 
-.hard{
-  font-size:26px;
-  filter: brightness(1.05);
-}
-
+/* عداد الفوز والخسارة */
 #score{
   margin:15px;
   font-size:18px;
@@ -82,15 +64,6 @@ select{
 
 <h1>اوجد الحيوان المختلف</h1>
 
-<div id="controls">
-اختر الصعوبة:
-<select id="difficulty">
-  <option value="easy">سهل</option>
-  <option value="medium" selected>متوسط</option>
-  <option value="hard">صعب</option>
-</select>
-</div>
-
 <div id="info">
 ⏱️ الوقت: <span id="time">10</span> ثواني
 </div>
@@ -104,6 +77,7 @@ select{
 </div>
 
 <script>
+// 🐾 جميع الحيوانات تقريبًا
 const animals = [
  "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸",
  "🐵","🐔","🐧","🐦","🦅","🦉","🦆","🦢","🦜","🦚",
@@ -126,8 +100,7 @@ function startGame(){
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  const difficulty = document.getElementById("difficulty").value;
-
+  // اختيار حيوان أساسي وحيوان مختلف
   let normal = animals[Math.floor(Math.random()*animals.length)];
   let different = animals[Math.floor(Math.random()*animals.length)];
   while(different === normal){
@@ -142,7 +115,7 @@ function startGame(){
     span.textContent = (i === diffIndex) ? different : normal;
 
     if(i === diffIndex){
-      span.classList.add(difficulty);
+      span.classList.add("diff");
     }
 
     span.onclick = () => {
