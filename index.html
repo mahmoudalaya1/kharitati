@@ -1,32 +1,67 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-    <meta charset="UTF-8">
-    <title>ALAYA | أسعار الذهب</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>اوجد الإيموجي المختلف</title>
+<style>
+body{
+  font-family: Arial;
+  background:#eee;
+  text-align:center;
+  direction:rtl;
+}
+h1{
+  background:red;
+  color:yellow;
+  padding:10px;
+}
+#grid{
+  display:grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap:8px;
+  max-width:600px;
+  margin:20px auto;
+}
+.cell{
+  font-size:32px;
+  cursor:pointer;
+}
+</style>
 </head>
 <body>
 
-<header>
-    <h1>ALAYA</h1>
-    <p>أسعار الذهب الحية</p>
-</header>
-
-<section class="prices">
-    <div>جرام ذهب 24: <span id="g24">--</span> $</div>
-    <div>أونصة الذهب: <span id="ounce">--</span> $</div>
-    <small>آخر تحديث: <span id="time">--</span></small>
-</section>
+<h1>اوجد الإيموجي المختلف</h1>
+<div id="grid"></div>
 
 <script>
-fetch("/api/prices")
-.then(res => res.json())
-.then(data => {
-    document.getElementById("g24").innerText = data.gram24;
-    document.getElementById("ounce").innerText = data.ounce;
-    document.getElementById("time").innerText =
-        new Date(data.updated).toLocaleString();
-});
+let size = 100;
+
+function startGame(){
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  let normal = "🟢";
+  let different = "🟡";
+  let diffIndex = Math.floor(Math.random()*size);
+
+  for(let i=0;i<size;i++){
+    let span = document.createElement("span");
+    span.className = "cell";
+    span.textContent = (i === diffIndex) ? different : normal;
+    span.onclick = () => {
+      if(i === diffIndex){
+        alert("✔️ ممتاز!");
+        size += 10;
+        startGame();
+      }else{
+        alert("❌ خطأ حاول مرة أخرى");
+      }
+    }
+    grid.appendChild(span);
+  }
+}
+
+startGame();
 </script>
 
 </body>
