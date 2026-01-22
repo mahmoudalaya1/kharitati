@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>اوجد الشكل المختلف - وضع صعب</title>
+<title>اوجد الحيوان المختلف</title>
 
 <style>
 body{
@@ -13,49 +13,42 @@ body{
   direction:rtl;
 }
 h1{
-  background:#b00000;
+  background:#8b0000;
   color:#ffd700;
   padding:15px;
   margin:0;
 }
 #info{
-  font-size:18px;
   margin:10px;
+  font-size:18px;
 }
 #grid{
   display:grid;
   grid-template-columns: repeat(12, 1fr);
-  gap:6px;
-  max-width:750px;
+  gap:10px;
+  max-width:800px;
   margin:20px auto;
 }
 .cell{
-  width:36px;
-  height:36px;
-  border-radius:50%;
+  font-size:34px;
   cursor:pointer;
+  user-select:none;
 }
 </style>
 </head>
 
 <body>
 
-<h1>اوجد الشكل المختلف</h1>
-<div id="info">
-⏱️ الوقت: <span id="time">10</span> ثانية
-</div>
-
+<h1>اوجد الحيوان المختلف</h1>
+<div id="info">⏱️ الوقت: <span id="time">10</span> ثواني</div>
 <div id="grid"></div>
 
 <script>
-let size = 120;
+const animals = ["🐦","🦅","🦒","🦁","🐄","🐑"];
+
+let size = 96;
 let time = 10;
 let timer;
-
-function randomColor(base){
-  let diff = Math.floor(Math.random()*15)+5;
-  return `rgb(${base+diff},${base+diff},${base+diff})`;
-}
 
 function startGame(){
   clearInterval(timer);
@@ -65,40 +58,38 @@ function startGame(){
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  let base = Math.floor(Math.random()*150);
-  let normalColor = `rgb(${base},${base},${base})`;
-  let diffColor = randomColor(base);
+  // اختيار حيوان أساسي ومختلف (مضمون مختلف)
+  let normal = animals[Math.floor(Math.random()*animals.length)];
+  let different = animals[Math.floor(Math.random()*animals.length)];
+  while(different === normal){
+    different = animals[Math.floor(Math.random()*animals.length)];
+  }
 
   let diffIndex = Math.floor(Math.random()*size);
 
   for(let i=0;i<size;i++){
-    let div = document.createElement("div");
-    div.className = "cell";
-    div.style.background = (i === diffIndex) ? diffColor : normalColor;
+    let span = document.createElement("span");
+    span.className = "cell";
+    span.textContent = (i === diffIndex) ? different : normal;
 
-    if(i === diffIndex){
-      div.style.width = "35px"; // فرق شبه غير ملحوظ
-      div.style.height = "35px";
-    }
-
-    div.onclick = () => {
+    span.onclick = () => {
       if(i === diffIndex){
-        alert("🔥 أسطورة!");
-        size += 12;
+        alert("🔥 صح! ممتاز");
+        size += 12; // تصعب أكثر
         startGame();
       }else{
         alert("❌ غلط!");
         startGame();
       }
-    }
-    grid.appendChild(div);
+    };
+    grid.appendChild(span);
   }
 
   timer = setInterval(()=>{
     time--;
     document.getElementById("time").textContent = time;
     if(time <= 0){
-      alert("⏰ انتهى الوقت!");
+      alert("⏰ انتهى الوقت");
       startGame();
     }
   },1000);
