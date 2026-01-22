@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>اوجد الشكل المختلف</title>
+<title>اوجد الشكل المختلف - وضع صعب</title>
 
 <style>
 body{
@@ -13,22 +13,27 @@ body{
   direction:rtl;
 }
 h1{
-  background:red;
-  color:yellow;
+  background:#b00000;
+  color:#ffd700;
   padding:15px;
   margin:0;
 }
+#info{
+  font-size:18px;
+  margin:10px;
+}
 #grid{
   display:grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap:10px;
-  max-width:700px;
-  margin:30px auto;
+  grid-template-columns: repeat(12, 1fr);
+  gap:6px;
+  max-width:750px;
+  margin:20px auto;
 }
 .cell{
-  font-size:32px;
+  width:36px;
+  height:36px;
+  border-radius:50%;
   cursor:pointer;
-  user-select:none;
 }
 </style>
 </head>
@@ -36,53 +41,67 @@ h1{
 <body>
 
 <h1>اوجد الشكل المختلف</h1>
+<div id="info">
+⏱️ الوقت: <span id="time">10</span> ثانية
+</div>
+
 <div id="grid"></div>
 
 <script>
-const shapes = [
- "🟢","🔵","🟡","🟣","🟠","🔴",
- "⬛","⬜","🟥","🟦","🟩","🟨",
- "⭐","🌟","❤️","💙","💚","💛",
- "😀","😃","😄","😁","😆",
- "🐶","🐱","🐭","🐹","🐰",
- "🍎","🍏","🍊","🍋","🍉"
-];
+let size = 120;
+let time = 10;
+let timer;
 
-let size = 60;
-
-function randomShape(){
-  return shapes[Math.floor(Math.random()*shapes.length)];
+function randomColor(base){
+  let diff = Math.floor(Math.random()*15)+5;
+  return `rgb(${base+diff},${base+diff},${base+diff})`;
 }
 
 function startGame(){
-  const grid = document.getElementById("grid");
-  if(!grid) return;
+  clearInterval(timer);
+  time = 10;
+  document.getElementById("time").textContent = time;
 
+  const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  let normal = randomShape();
-  let different = randomShape();
-  while(different === normal){
-    different = randomShape();
-  }
+  let base = Math.floor(Math.random()*150);
+  let normalColor = `rgb(${base},${base},${base})`;
+  let diffColor = randomColor(base);
 
   let diffIndex = Math.floor(Math.random()*size);
 
   for(let i=0;i<size;i++){
-    const span = document.createElement("span");
-    span.className = "cell";
-    span.textContent = (i === diffIndex) ? different : normal;
-    span.onclick = () => {
+    let div = document.createElement("div");
+    div.className = "cell";
+    div.style.background = (i === diffIndex) ? diffColor : normalColor;
+
+    if(i === diffIndex){
+      div.style.width = "35px"; // فرق شبه غير ملحوظ
+      div.style.height = "35px";
+    }
+
+    div.onclick = () => {
       if(i === diffIndex){
-        alert("✔️ ممتاز!");
-        size += 10;
+        alert("🔥 أسطورة!");
+        size += 12;
         startGame();
       }else{
-        alert("❌ خطأ");
+        alert("❌ غلط!");
+        startGame();
       }
-    };
-    grid.appendChild(span);
+    }
+    grid.appendChild(div);
   }
+
+  timer = setInterval(()=>{
+    time--;
+    document.getElementById("time").textContent = time;
+    if(time <= 0){
+      alert("⏰ انتهى الوقت!");
+      startGame();
+    }
+  },1000);
 }
 
 startGame();
