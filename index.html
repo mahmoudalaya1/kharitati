@@ -8,14 +8,14 @@
 body{
   margin:0;
   font-family: Arial;
-  background:#dff0e3; /* ✅ لون الخلفية الجديد */
+  background:#f0f0f0;
   text-align:center;
   direction:rtl;
 }
 
 h1{
-  background:#006400;
-  color:#fff;
+  background:#8b0000;
+  color:#ffd700;
   padding:15px;
   margin:0;
 }
@@ -28,25 +28,34 @@ h1{
 #grid{
   display:grid;
   grid-template-columns: repeat(20, 1fr); /* 200 عنصر */
-  gap:10px;
-  max-width:900px;
+  gap:8px;
+  max-width:920px;
   margin:20px auto;
 }
 
 .cell{
-  font-size:30px;
+  font-size:28px;
   cursor:pointer;
   user-select:none;
   display:flex;
   align-items:center;
   justify-content:center;
-  height:38px;
+  height:36px;
 }
 
-/* الفرق الواضح والمريح */
+/* الفرق (واضح بس مو قاسي) */
 .diff{
   font-size:24px;
-  opacity:0.7;
+  filter: brightness(1.2);
+}
+
+/* عداد الفوز والخسارة */
+#score{
+  margin:15px;
+  font-size:18px;
+  background:#fff;
+  padding:10px;
+  border-top:2px solid #ccc;
 }
 </style>
 </head>
@@ -54,15 +63,34 @@ h1{
 <body>
 
 <h1>اوجد الحيوان المختلف</h1>
-<div id="info">⏱️ الوقت: <span id="time">10</span> ثواني</div>
+
+<div id="info">
+⏱️ الوقت: <span id="time">10</span> ثواني
+</div>
+
 <div id="grid"></div>
 
-<script>
-const animals = ["🐦","🦅","🦒","🦁","🐄","🐑"];
-const SIZE = 200;
+<div id="score">
+🏆 فزت: <span id="wins">0</span>
+&nbsp;&nbsp;|&nbsp;&nbsp;
+💔 خسرت: <span id="losses">0</span>
+</div>
 
+<script>
+// 🐾 جميع الحيوانات تقريبًا
+const animals = [
+ "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸",
+ "🐵","🐔","🐧","🐦","🦅","🦉","🦆","🦢","🦜","🦚",
+ "🐺","🐗","🐴","🦄","🐝","🦋","🐌","🐞",
+ "🐢","🐍","🦎","🦂","🦀","🐙","🦑","🐠","🐟","🐬","🐳",
+ "🐘","🦒","🦓","🦌","🐄","🐑","🐐","🦙","🦘","🦏","🦛"
+];
+
+const SIZE = 200;
 let time = 10;
 let timer;
+let wins = 0;
+let losses = 0;
 
 function startGame(){
   clearInterval(timer);
@@ -72,13 +100,19 @@ function startGame(){
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  const animal = animals[Math.floor(Math.random()*animals.length)];
+  // اختيار حيوان أساسي وحيوان مختلف
+  let normal = animals[Math.floor(Math.random()*animals.length)];
+  let different = animals[Math.floor(Math.random()*animals.length)];
+  while(different === normal){
+    different = animals[Math.floor(Math.random()*animals.length)];
+  }
+
   const diffIndex = Math.floor(Math.random()*SIZE);
 
   for(let i=0;i<SIZE;i++){
     const span = document.createElement("span");
     span.className = "cell";
-    span.textContent = animal;
+    span.textContent = (i === diffIndex) ? different : normal;
 
     if(i === diffIndex){
       span.classList.add("diff");
@@ -86,10 +120,14 @@ function startGame(){
 
     span.onclick = () => {
       if(i === diffIndex){
-        alert("🎉 صح! حلوة 👌");
+        wins++;
+        document.getElementById("wins").textContent = wins;
+        alert("🎉 صح!");
         startGame();
       }else{
-        alert("❌ جرّب مرة ثانية");
+        losses++;
+        document.getElementById("losses").textContent = losses;
+        alert("❌ غلط");
       }
     };
 
@@ -100,6 +138,8 @@ function startGame(){
     time--;
     document.getElementById("time").textContent = time;
     if(time <= 0){
+      losses++;
+      document.getElementById("losses").textContent = losses;
       alert("⏰ انتهى الوقت");
       startGame();
     }
