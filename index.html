@@ -2,67 +2,74 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>اوجد الإيموجي المختلف</title>
+<title>اوجد الشكل المختلف</title>
 <style>
 body{
   font-family: Arial;
-  background:#eee;
+  background:#f2f2f2;
   text-align:center;
   direction:rtl;
 }
 h1{
   background:red;
   color:yellow;
-  padding:10px;
+  padding:12px;
 }
 #grid{
   display:grid;
   grid-template-columns: repeat(10, 1fr);
-  gap:8px;
-  max-width:600px;
+  gap:10px;
+  max-width:650px;
   margin:20px auto;
 }
 .cell{
-  font-size:32px;
+  font-size:30px;
   cursor:pointer;
+  user-select:none;
 }
 </style>
 </head>
 <body>
 
-<h1>اوجد الإيموجي المختلف</h1>
+<h1>اوجد الشكل المختلف</h1>
 <div id="grid"></div>
 
 <script>
-let size = 100;
+// 🔥 جميع الأشكال والإيموجيات
+const shapes = [
+ "🟢","🔵","🟡","🟣","🟠","🔴",
+ "⬛","⬜","🟥","🟦","🟩","🟨",
+ "⭐","🌟","❤️","💙","💚","💛",
+ "🍎","🍏","🍊","🍋","🍉",
+ "😀","😃","😄","😁","😆",
+ "🐶","🐱","🐭","🐹","🐰"
+];
+
+let size = 80;
+
+function randomShape(){
+  return shapes[Math.floor(Math.random()*shapes.length)];
+}
 
 function startGame(){
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  let normal = "🟢";
-  let different = "🟡";
+  let normal = randomShape();
+  let different = randomShape();
+
+  while(different === normal){
+    different = randomShape();
+  }
+
   let diffIndex = Math.floor(Math.random()*size);
 
   for(let i=0;i<size;i++){
     let span = document.createElement("span");
     span.className = "cell";
     span.textContent = (i === diffIndex) ? different : normal;
+
     span.onclick = () => {
       if(i === diffIndex){
         alert("✔️ ممتاز!");
         size += 10;
-        startGame();
-      }else{
-        alert("❌ خطأ حاول مرة أخرى");
-      }
-    }
-    grid.appendChild(span);
-  }
-}
-
-startGame();
-</script>
-
-</body>
-</html>
