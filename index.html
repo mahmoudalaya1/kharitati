@@ -1,34 +1,33 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
-<meta charset="UTF-8">
-<title>ALAYA TUBE</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{margin:0;font-family:tahoma;background:#0f0f0f;color:white}
-header{padding:12px 20px;background:#181818;font-size:22px;font-weight:bold}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding:20px}
-.card{background:#202020;border-radius:12px;overflow:hidden}
-.card video{width:100%;height:160px;object-fit:cover}
-.card .info{padding:10px}
-.card h3{margin:0;font-size:16px}
-.card span{font-size:13px;color:#aaa}
-</style>
+    <meta charset="UTF-8">
+    <title>ALAYA | أسعار الذهب</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<header>▶️ ALAYA TUBE</header>
+<header>
+    <h1>ALAYA</h1>
+    <p>أسعار الذهب الحية</p>
+</header>
 
-<div class="grid">
-  <div class="card">
-    <video src="videos/video1.mp4" controls></video>
-    <div class="info">
-      <h3>فيديو تجريبي</h3>
-      <span>شركة علايا • 1,245 مشاهدة</span>
-    </div>
-  </div>
-</div>
+<section class="prices">
+    <div>جرام ذهب 24: <span id="g24">--</span> $</div>
+    <div>أونصة الذهب: <span id="ounce">--</span> $</div>
+    <small>آخر تحديث: <span id="time">--</span></small>
+</section>
+
+<script>
+fetch("/api/prices")
+.then(res => res.json())
+.then(data => {
+    document.getElementById("g24").innerText = data.gram24;
+    document.getElementById("ounce").innerText = data.ounce;
+    document.getElementById("time").innerText =
+        new Date(data.updated).toLocaleString();
+});
+</script>
 
 </body>
 </html>
