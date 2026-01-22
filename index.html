@@ -8,13 +8,13 @@
 body{
   margin:0;
   font-family: Arial;
-  background:#e5e5e5;
+  background:#f0f0f0;
   text-align:center;
   direction:rtl;
 }
 
 h1{
-  background:#7a0000;
+  background:#8b0000;
   color:#ffd700;
   padding:15px;
   margin:0;
@@ -27,27 +27,26 @@ h1{
 
 #grid{
   display:grid;
-  grid-template-columns: repeat(20, 1fr); /* 20 × 10 = 200 */
-  gap:6px;
-  max-width:920px;
+  grid-template-columns: repeat(20, 1fr); /* 200 عنصر */
+  gap:8px;
+  max-width:900px;
   margin:20px auto;
-  background:#e5e5e5;
 }
 
 .cell{
-  font-size:26px;
+  font-size:28px;
   cursor:pointer;
   user-select:none;
-  background:#e5e5e5;
   display:flex;
   align-items:center;
   justify-content:center;
-  height:34px;
+  height:36px;
 }
 
-/* 👁️ الاختلاف الحقيقي (غير لوني) */
+/* الفرق المعقول */
 .diff{
-  transform: rotate(8deg) scale(0.92);
+  font-size:24px;          /* أصغر شوي */
+  filter: brightness(1.2); /* أفتح شوي */
 }
 </style>
 </head>
@@ -55,27 +54,24 @@ h1{
 <body>
 
 <h1>اوجد الحيوان المختلف</h1>
-<div id="info">⏱️ الوقت: <span id="time">6</span> ثواني</div>
+<div id="info">⏱️ الوقت: <span id="time">10</span> ثواني</div>
 <div id="grid"></div>
 
 <script>
 const animals = ["🐦","🦅","🦒","🦁","🐄","🐑"];
 const SIZE = 200;
-let time = 6;
+let time = 10;
 let timer;
 
 function startGame(){
   clearInterval(timer);
-  time = 6;
+  time = 10;
   document.getElementById("time").textContent = time;
 
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  // نفس الحيوان للجميع
   const animal = animals[Math.floor(Math.random()*animals.length)];
-
-  // عنصر مختلف واحد فقط
   const diffIndex = Math.floor(Math.random()*SIZE);
 
   for(let i=0;i<SIZE;i++){
@@ -84,16 +80,15 @@ function startGame(){
     span.textContent = animal;
 
     if(i === diffIndex){
-      span.classList.add("diff"); // 👈 الفرق
+      span.classList.add("diff");
     }
 
     span.onclick = () => {
       if(i === diffIndex){
-        alert("🔥 صح! عينك قوية");
+        alert("😄 صح! ممتاز");
         startGame();
       }else{
         alert("❌ غلط");
-        startGame();
       }
     };
 
