@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>اوجد الحيوان المختلف</title>
+<title>اوجد الحيوان المختلف - صعب</title>
 
 <style>
 body{
@@ -24,13 +24,13 @@ h1{
 }
 #grid{
   display:grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap:10px;
-  max-width:800px;
+  grid-template-columns: repeat(20, 1fr); /* 20 × 10 = 200 */
+  gap:6px;
+  max-width:900px;
   margin:20px auto;
 }
 .cell{
-  font-size:34px;
+  font-size:28px;
   cursor:pointer;
   user-select:none;
 }
@@ -40,48 +40,51 @@ h1{
 <body>
 
 <h1>اوجد الحيوان المختلف</h1>
-<div id="info">⏱️ الوقت: <span id="time">10</span> ثواني</div>
+<div id="info">⏱️ الوقت: <span id="time">7</span> ثواني</div>
 <div id="grid"></div>
 
 <script>
 const animals = ["🐦","🦅","🦒","🦁","🐄","🐑"];
 
-let size = 96;
-let time = 10;
+const SIZE = 200;   // 🔥 ثابت
+let time = 7;
 let timer;
 
 function startGame(){
   clearInterval(timer);
-  time = 10;
+  time = 7;
   document.getElementById("time").textContent = time;
 
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  // اختيار حيوان أساسي ومختلف (مضمون مختلف)
+  // اختيار حيوان أساسي
   let normal = animals[Math.floor(Math.random()*animals.length)];
+
+  // اختيار مختلف قريب (بس مو نفسه)
   let different = animals[Math.floor(Math.random()*animals.length)];
   while(different === normal){
     different = animals[Math.floor(Math.random()*animals.length)];
   }
 
-  let diffIndex = Math.floor(Math.random()*size);
+  // موقع مختلف واحد فقط
+  let diffIndex = Math.floor(Math.random()*SIZE);
 
-  for(let i=0;i<size;i++){
+  for(let i=0;i<SIZE;i++){
     let span = document.createElement("span");
     span.className = "cell";
     span.textContent = (i === diffIndex) ? different : normal;
 
     span.onclick = () => {
       if(i === diffIndex){
-        alert("🔥 صح! ممتاز");
-        size += 12; // تصعب أكثر
-        startGame();
+        alert("🔥 صح! عينك قوية");
+        startGame(); // نفس الصعوبة
       }else{
         alert("❌ غلط!");
         startGame();
       }
     };
+
     grid.appendChild(span);
   }
 
