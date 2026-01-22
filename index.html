@@ -2,18 +2,18 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>اوجد الحيوان المختلف - صعب</title>
+<title>اوجد الحيوان المختلف - مستحيل</title>
 
 <style>
 body{
   margin:0;
   font-family: Arial;
-  background:#f2f2f2;
+  background:#e5e5e5;
   text-align:center;
   direction:rtl;
 }
 h1{
-  background:#8b0000;
+  background:#7a0000;
   color:#ffd700;
   padding:15px;
   margin:0;
@@ -24,15 +24,17 @@ h1{
 }
 #grid{
   display:grid;
-  grid-template-columns: repeat(20, 1fr); /* 20 × 10 = 200 */
+  grid-template-columns: repeat(20, 1fr); /* 200 عنصر */
   gap:6px;
-  max-width:900px;
+  max-width:920px;
   margin:20px auto;
+  background:#e5e5e5; /* نفس لون الحيوانات */
 }
 .cell{
-  font-size:28px;
+  font-size:26px;
   cursor:pointer;
   user-select:none;
+  background:#e5e5e5; /* نفس الخلفية */
 }
 </style>
 </head>
@@ -40,19 +42,18 @@ h1{
 <body>
 
 <h1>اوجد الحيوان المختلف</h1>
-<div id="info">⏱️ الوقت: <span id="time">7</span> ثواني</div>
+<div id="info">⏱️ الوقت: <span id="time">6</span> ثواني</div>
 <div id="grid"></div>
 
 <script>
 const animals = ["🐦","🦅","🦒","🦁","🐄","🐑"];
-
-const SIZE = 200;   // 🔥 ثابت
-let time = 7;
+const SIZE = 200;
+let time = 6;
 let timer;
 
 function startGame(){
   clearInterval(timer);
-  time = 7;
+  time = 6;
   document.getElementById("time").textContent = time;
 
   const grid = document.getElementById("grid");
@@ -60,14 +61,11 @@ function startGame(){
 
   // اختيار حيوان أساسي
   let normal = animals[Math.floor(Math.random()*animals.length)];
-
-  // اختيار مختلف قريب (بس مو نفسه)
   let different = animals[Math.floor(Math.random()*animals.length)];
   while(different === normal){
     different = animals[Math.floor(Math.random()*animals.length)];
   }
 
-  // موقع مختلف واحد فقط
   let diffIndex = Math.floor(Math.random()*SIZE);
 
   for(let i=0;i<SIZE;i++){
@@ -77,10 +75,10 @@ function startGame(){
 
     span.onclick = () => {
       if(i === diffIndex){
-        alert("🔥 صح! عينك قوية");
-        startGame(); // نفس الصعوبة
+        alert("🔥 مستواك مرعب");
+        startGame();
       }else{
-        alert("❌ غلط!");
+        alert("❌ غلط");
         startGame();
       }
     };
