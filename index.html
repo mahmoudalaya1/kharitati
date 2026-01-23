@@ -146,6 +146,7 @@ html,body{
   <button class="action-btn" id="nav">▶️</button>
   <button class="action-btn" id="share">📤</button>
   <button class="action-btn" id="weatherBtn">🌦️</button>
+  <button class="action-btn" id="terrainBtn">⛰️</button>
   <button class="action-btn" id="tour">🧭</button>
 </div>
 
@@ -160,22 +161,34 @@ html,body{
 <div id="map"></div>
 
 <script>
-/* ===== Map ===== */
+/* ===== Map Layers ===== */
+const streetLayer = L.tileLayer(
+ "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+ {maxZoom:19}
+);
+
+const terrainLayer = L.tileLayer(
+ "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+ {maxZoom:17}
+);
+
+const satelliteLayer = L.tileLayer(
+ "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+ {maxZoom:19}
+);
+
+/* ===== Map Init ===== */
 const map = L.map("map",{zoomControl:true})
 .setView([36.2021,37.1343],13);
 
-L.tileLayer(
- "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
- {maxZoom:19}
-).addTo(map);
+streetLayer.addTo(map);
+let currentLayer="street";
 
 /* ===== State ===== */
 let userMarker,start,end,route;
 
 /* ===== Locate ===== */
-loc.onclick=()=>{
-  map.locate({setView:true,maxZoom:16});
-};
+loc.onclick=()=>map.locate({setView:true,maxZoom:16});
 
 map.on("locationfound",e=>{
   start=[e.latlng.lat,e.latlng.lng];
@@ -246,6 +259,28 @@ weatherBtn.onclick=()=>{
     weather.style.display=
       weather.style.display==="block"?"none":"block";
   });
+};
+
+/* ===== Terrain / Satellite Toggle ===== */
+terrainBtn.onclick=()=>{
+  if(currentLayer==="street"){
+    map.removeLayer(streetLayer);
+    terrainLayer.addTo(map);
+    currentLayer="terrain";
+    sheetTitle.innerText="⛰️ وضع التضاريس";
+  }
+  else if(currentLayer==="terrain"){
+    map.removeLayer(terrainLayer);
+    satelliteLayer.addTo(map);
+    currentLayer="satellite";
+    sheetTitle.innerText="🛰️ القمر الصناعي";
+  }
+  else{
+    map.removeLayer(satelliteLayer);
+    streetLayer.addTo(map);
+    currentLayer="street";
+    sheetTitle.innerText="🗺️ الخريطة العادية";
+  }
 };
 
 /* ===== Virtual Tour ===== */
