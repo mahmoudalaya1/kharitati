@@ -9,92 +9,47 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+<!-- Search -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css">
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
 <style>
-html,body{
-  margin:0;
-  height:100%;
-  font-family:Arial, sans-serif;
-}
+html,body{margin:0;height:100%;font-family:Arial}
 #map{height:100%}
 
-/* ===== App Bar ===== */
+/* ===== AppBar ===== */
 #appBar{
-  position:fixed;
-  top:0;left:0;right:0;
-  height:56px;
-  background:#2f3f9e;
-  color:#fff;
-  display:flex;
-  align-items:center;
-  padding:0 12px;
-  z-index:1200;
+  position:fixed;top:0;left:0;right:0;height:56px;
+  background:#2f3f9e;color:#fff;
+  display:flex;align-items:center;
+  padding:0 12px;z-index:2000
 }
 #title{flex:1;font-weight:bold}
-#more{font-size:22px}
-
-/* ===== Search ===== */
-#searchBox{
-  position:fixed;
-  top:64px;
-  left:12px;
-  right:12px;
-  background:#fff;
-  border-radius:14px;
-  display:flex;
-  padding:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,.3);
-  z-index:1200;
-}
-#searchInput{
-  flex:1;
-  border:none;
-  font-size:15px;
-  outline:none;
-}
-#results{
-  position:fixed;
-  top:120px;
-  left:12px;
-  right:12px;
-  background:#fff;
-  border-radius:14px;
-  max-height:55vh;
-  overflow:auto;
-  box-shadow:0 6px 18px rgba(0,0,0,.3);
-  z-index:1200;
-}
-#results div{
-  padding:12px;
-  border-bottom:1px solid #eee;
-  cursor:pointer;
-}
-#results div:hover{background:#f5f5f5}
-.small{font-size:12px;color:#777}
 
 /* ===== Buttons ===== */
-.map-btn{
-  position:fixed;
-  right:12px;
-  width:44px;height:44px;
-  background:#fff;
+.btn{
+  position:fixed;right:14px;
+  width:46px;height:46px;
+  border-radius:50%;
   border:none;
-  border-radius:8px;
-  font-size:22px;
-  box-shadow:0 4px 10px rgba(0,0,0,.25);
-  z-index:1100;
+  background:#fff;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  font-size:20px;
+  cursor:pointer;
+  z-index:1500
 }
-#zoomIn{top:190px}
-#zoomOut{top:240px}
-#locate{top:290px;color:#1976d2}
-#startNav{top:340px;color:#ff9800}
+#locate{top:80px}
+#startNav{top:136px;background:#ff9800;color:#fff}
+#share{top:192px}
+#layers{top:248px}
 
-/* ===== User dot ===== */
+/* ===== User Dot ===== */
 .user-dot{
   width:16px;height:16px;
-  background:#1976d2;
+  background:#2979ff;
   border:3px solid #fff;
   border-radius:50%;
-  box-shadow:0 0 0 6px rgba(25,118,210,.3);
+  box-shadow:0 0 0 8px rgba(41,121,255,.3)
 }
 </style>
 </head>
@@ -103,104 +58,103 @@ html,body{
 
 <div id="appBar">
   <div id="title">MAHMOUD ALAYA</div>
-  <div id="more">⋮</div>
 </div>
 
-<div id="searchBox">
-  <input id="searchInput" placeholder="ابحث عن مكان">
-</div>
-<div id="results"></div>
-
-<button id="zoomIn" class="map-btn">＋</button>
-<button id="zoomOut" class="map-btn">－</button>
-<button id="locate" class="map-btn">📍</button>
-<button id="startNav" class="map-btn">▶️</button>
+<button id="locate" class="btn">📍</button>
+<button id="startNav" class="btn">▶</button>
+<button id="share" class="btn">📤</button>
+<button id="layers" class="btn">🗺️</button>
 
 <div id="map"></div>
 
 <script>
-/* ===== MAP ===== */
-const map = L.map('map',{zoomControl:false})
-.setView([41.0476,28.9465],14);
+// ================== MAP ==================
+const normal = L.tileLayer(
+  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {maxZoom:19}
+);
 
-L.tileLayer(
-'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-{maxZoom:19}
-).addTo(map);
+const satellite = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {maxZoom:19}
+);
 
-/* ===== STATE ===== */
-let userLatLng=null;
+const terrain = L.tileLayer(
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+  {maxZoom:17}
+);
+
+const map = L.map('map',{
+  zoomControl:true,
+  layers:[normal]
+}).setView([36.2021,37.1343],13);
+
+L.control.layers({
+  "🗺️ عادي": normal,
+  "🛰️ قمر صناعي": satellite,
+  "🏔️ تضاريس": terrain
+}).addTo(map);
+
+// ================== SEARCH ==================
+L.Control.geocoder({
+  defaultMarkGeocode:true
+}).addTo(map);
+
+// ================== GPS FOLLOW ==================
 let userMarker=null;
-let destMarker=null;
+let watchId=null;
 let routeLine=null;
+let startPoint=null;
+let destPoint=null;
 
-/* ===== Controls ===== */
-zoomIn.onclick=()=>map.zoomIn();
-zoomOut.onclick=()=>map.zoomOut();
-
-/* ===== Location ===== */
 locate.onclick=()=>{
-  map.locate({watch:true,setView:true,enableHighAccuracy:true});
+  if(watchId) return;
+  watchId = navigator.geolocation.watchPosition(p=>{
+    const latlng=[p.coords.latitude,p.coords.longitude];
+    startPoint=latlng;
+
+    if(!userMarker){
+      userMarker=L.marker(latlng,{
+        icon:L.divIcon({
+          className:'',
+          html:'<div class="user-dot"></div>',
+          iconSize:[16,16]
+        })
+      }).addTo(map);
+    }else{
+      userMarker.setLatLng(latlng);
+    }
+    map.setView(latlng,17);
+    updateRoute();
+  },err=>alert("فعّل GPS"));
 };
 
-map.on("locationfound",e=>{
-  userLatLng=e.latlng;
-  if(!userMarker){
-    userMarker=L.marker(e.latlng,{
-      icon:L.divIcon({
-        className:"",
-        html:'<div class="user-dot"></div>',
-        iconSize:[16,16]
-      })
-    }).addTo(map);
-  }else{
-    userMarker.setLatLng(e.latlng);
-  }
+// ================== ROUTE ==================
+map.on("click",e=>{
+  destPoint=[e.latlng.lat,e.latlng.lng];
+  updateRoute();
 });
 
-/* ===== Search ===== */
-searchInput.oninput=()=>{
-  const q=searchInput.value.trim();
-  if(q.length<2){results.innerHTML="";return;}
+function updateRoute(){
+  if(!startPoint||!destPoint) return;
 
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&accept-language=ar`)
-  .then(r=>r.json())
-  .then(data=>{
-    results.innerHTML="";
-    data.slice(0,8).forEach(p=>{
-      let d="";
-      if(userLatLng){
-        d=(map.distance(userLatLng,[p.lat,p.lon])/1000).toFixed(1)+" كم";
-      }
-      const div=document.createElement("div");
-      div.innerHTML=`<b>${p.display_name.split(",")[0]}</b><br>
-      <span class="small">${p.display_name}</span>
-      <span class="small"> ${d}</span>`;
-      div.onclick=()=>{
-        const ll=[p.lat,p.lon];
-        map.setView(ll,16);
-        if(destMarker) map.removeLayer(destMarker);
-        destMarker=L.marker(ll).addTo(map);
-        results.innerHTML="";
-      };
-      results.appendChild(div);
-    });
-  });
-};
-
-/* ===== Navigation ===== */
-startNav.onclick=()=>{
-  if(!userLatLng||!destMarker){alert("حدد وجهة");return;}
-  const a=userLatLng;
-  const b=destMarker.getLatLng();
-  fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`)
-  .then(r=>r.json())
-  .then(d=>{
+  fetch(`https://router.project-osrm.org/route/v1/foot/${startPoint[1]},${startPoint[0]};${destPoint[1]},${destPoint[0]}?overview=full&geometries=geojson`)
+  .then(r=>r.json()).then(d=>{
     if(routeLine) map.removeLayer(routeLine);
     routeLine=L.geoJSON(d.routes[0].geometry,{
-      style:{color:"#1976d2",weight:6}
+      style:{color:"#2979ff",weight:6}
     }).addTo(map);
   });
+}
+
+startNav.onclick=()=>updateRoute();
+
+// ================== SHARE ==================
+share.onclick=()=>{
+  if(!startPoint) return alert("حدد موقعك أولاً");
+  const link=`https://maps.google.com/?q=${startPoint[0]},${startPoint[1]}`;
+  navigator.clipboard.writeText(link);
+  alert("تم نسخ رابط موقعك");
 };
 </script>
 
