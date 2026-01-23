@@ -1,132 +1,207 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>لعبة تخبيص المخ</title>
+<title>خريطتي</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-body{
-  background:#111;
+html,body{
+  margin:0;
+  height:100%;
+  font-family:Arial, sans-serif;
+}
+#map{height:100%}
+
+/* ===== App Bar ===== */
+#appBar{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:56px;
+  background:#2f3f9e;
   color:#fff;
-  font-family:Arial;
-  text-align:center;
-  direction:rtl;
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  z-index:1200;
 }
+#title{flex:1;font-weight:bold}
+#more{font-size:22px}
 
-h2{ margin:10px; }
-
-#level{ font-size:22px; margin-bottom:10px; }
-
-#grid{
-  display:grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap:10px;
-  max-width:600px;
-  margin:auto;
-}
-
-.item{
-  background:#222;
-  border-radius:10px;
+/* ===== Search ===== */
+#searchBox{
+  position:fixed;
+  top:64px;
+  left:12px;
+  right:12px;
+  background:#fff;
+  border-radius:14px;
+  display:flex;
   padding:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.3);
+  z-index:1200;
+}
+#searchInput{
+  flex:1;
+  border:none;
+  font-size:15px;
+  outline:none;
+}
+#results{
+  position:fixed;
+  top:120px;
+  left:12px;
+  right:12px;
+  background:#fff;
+  border-radius:14px;
+  max-height:55vh;
+  overflow:auto;
+  box-shadow:0 6px 18px rgba(0,0,0,.3);
+  z-index:1200;
+}
+#results div{
+  padding:12px;
+  border-bottom:1px solid #eee;
   cursor:pointer;
-  border:2px solid #444;
 }
+#results div:hover{background:#f5f5f5}
+.small{font-size:12px;color:#777}
 
-.item span{
-  display:block;
-  margin-top:5px;
-  font-size:18px;
+/* ===== Buttons ===== */
+.map-btn{
+  position:fixed;
+  right:12px;
+  width:44px;height:44px;
+  background:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:22px;
+  box-shadow:0 4px 10px rgba(0,0,0,.25);
+  z-index:1100;
 }
+#zoomIn{top:190px}
+#zoomOut{top:240px}
+#locate{top:290px;color:#1976d2}
+#startNav{top:340px;color:#ff9800}
 
-.correct{ border-color:lime; }
-.wrong{ border-color:red; }
+/* ===== User dot ===== */
+.user-dot{
+  width:16px;height:16px;
+  background:#1976d2;
+  border:3px solid #fff;
+  border-radius:50%;
+  box-shadow:0 0 0 6px rgba(25,118,210,.3);
+}
 </style>
 </head>
 
 <body>
 
-<h2>🧠 لا تثق بعقلك</h2>
-<div id="level"></div>
-<div id="grid"></div>
+<div id="appBar">
+  <div id="title">MAHMOUD ALAYA</div>
+  <div id="more">⋮</div>
+</div>
+
+<div id="searchBox">
+  <input id="searchInput" placeholder="ابحث عن مكان">
+</div>
+<div id="results"></div>
+
+<button id="zoomIn" class="map-btn">＋</button>
+<button id="zoomOut" class="map-btn">－</button>
+<button id="locate" class="map-btn">📍</button>
+<button id="startNav" class="map-btn">▶️</button>
+
+<div id="map"></div>
 
 <script>
-let stage = 1;
+/* ===== MAP ===== */
+const map = L.map('map',{zoomControl:false})
+.setView([41.0476,28.9465],14);
 
-const stages = [
-  // المرحلة 1
-  [
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-  ],
-  // المرحلة 2
-  [
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🧅", text:"بصل", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"🧅", text:"بصل", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🪨", text:"فحم", ok:true},
-  ],
-  // المرحلة 3
-  [
-    {icon:"🍖", text:"فحم", ok:false},
-    {icon:"🪨", text:"لمبة", ok:false},
-    {icon:"💡", text:"لحم", ok:false},
-    {icon:"🧅", text:"بصل", ok:true},
-    {icon:"🍖", text:"لحم", ok:true},
-    {icon:"🪨", text:"فحم", ok:true},
-    {icon:"💡", text:"لمبة", ok:true},
-    {icon:"🧅", text:"فحم", ok:false},
-  ],
-  // المرحلة 4 (تخريب كامل)
-  [
-    {icon:"🍖", text:"فحم", ok:false},
-    {icon:"🪨", text:"بصل", ok:false},
-    {icon:"🧅", text:"لمبة", ok:false},
-    {icon:"💡", text:"لحم", ok:false},
-    {icon:"🍎", text:"فحم", ok:false},
-    {icon:"🐟", text:"بصل", ok:false},
-    {icon:"🥚", text:"لمبة", ok:false},
-    {icon:"🍞", text:"لحم", ok:false},
-  ]
-];
+L.tileLayer(
+'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+{maxZoom:19}
+).addTo(map);
 
-function loadStage(){
-  const grid = document.getElementById("grid");
-  const level = document.getElementById("level");
-  grid.innerHTML = "";
-  level.innerHTML = `المرحلة ${stage} / 4`;
+/* ===== STATE ===== */
+let userLatLng=null;
+let userMarker=null;
+let destMarker=null;
+let routeLine=null;
 
-  stages[stage-1].forEach(item=>{
-    const div = document.createElement("div");
-    div.className="item";
-    div.innerHTML = `<div style="font-size:40px">${item.icon}</div><span>${item.text}</span>`;
-    div.onclick = ()=>{
-      if(item.ok){
-        div.classList.add("correct");
-        setTimeout(()=>{
-          stage++;
-          if(stage<=4) loadStage();
-          else alert("🔥 خلصت اللعبة! مخك نجا؟ 😅");
-        },500);
-      }else{
-        div.classList.add("wrong");
+/* ===== Controls ===== */
+zoomIn.onclick=()=>map.zoomIn();
+zoomOut.onclick=()=>map.zoomOut();
+
+/* ===== Location ===== */
+locate.onclick=()=>{
+  map.locate({watch:true,setView:true,enableHighAccuracy:true});
+};
+
+map.on("locationfound",e=>{
+  userLatLng=e.latlng;
+  if(!userMarker){
+    userMarker=L.marker(e.latlng,{
+      icon:L.divIcon({
+        className:"",
+        html:'<div class="user-dot"></div>',
+        iconSize:[16,16]
+      })
+    }).addTo(map);
+  }else{
+    userMarker.setLatLng(e.latlng);
+  }
+});
+
+/* ===== Search ===== */
+searchInput.oninput=()=>{
+  const q=searchInput.value.trim();
+  if(q.length<2){results.innerHTML="";return;}
+
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&accept-language=ar`)
+  .then(r=>r.json())
+  .then(data=>{
+    results.innerHTML="";
+    data.slice(0,8).forEach(p=>{
+      let d="";
+      if(userLatLng){
+        d=(map.distance(userLatLng,[p.lat,p.lon])/1000).toFixed(1)+" كم";
       }
-    };
-    grid.appendChild(div);
+      const div=document.createElement("div");
+      div.innerHTML=`<b>${p.display_name.split(",")[0]}</b><br>
+      <span class="small">${p.display_name}</span>
+      <span class="small"> ${d}</span>`;
+      div.onclick=()=>{
+        const ll=[p.lat,p.lon];
+        map.setView(ll,16);
+        if(destMarker) map.removeLayer(destMarker);
+        destMarker=L.marker(ll).addTo(map);
+        results.innerHTML="";
+      };
+      results.appendChild(div);
+    });
   });
-}
+};
 
-loadStage();
+/* ===== Navigation ===== */
+startNav.onclick=()=>{
+  if(!userLatLng||!destMarker){alert("حدد وجهة");return;}
+  const a=userLatLng;
+  const b=destMarker.getLatLng();
+  fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`)
+  .then(r=>r.json())
+  .then(d=>{
+    if(routeLine) map.removeLayer(routeLine);
+    routeLine=L.geoJSON(d.routes[0].geometry,{
+      style:{color:"#1976d2",weight:6}
+    }).addTo(map);
+  });
+};
 </script>
 
 </body>
